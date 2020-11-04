@@ -1,0 +1,568 @@
+---
+title: "Cervical organoids - mRNA microarray expression analysis, part III"
+output: 
+ html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: false
+    number_sections: true
+    code_folding: hide
+    
+pdf_document:
+    fig_caption: true
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M:%S')`"
+author: "Hilmar Berger"
+---
+
+```{r init, message=FALSE}
+rm(list=ls())
+#source("/data_genome1/SharedSoftware/inhouse_development/R/FunctionalEnrichmentHelpers.R")
+source("Helper_functions.R")
+library(limma)
+library(xlsx)
+library(reshape2)
+library(pheatmap)
+library(GSA)
+library(xtable)
+library(gplots)
+library(impute)
+library(gplots)
+library(RColorBrewer)
+library(scatterplot3d)
+library(naturalsort)
+library(ggplot2)
+library(data.table)
+library(GenomicRanges)
+library(VennDiagram)
+flog.threshold(ERROR) # to stop VennDiagram writing a log file for each plot
+suppressMessages(library("rrcov"))
+library(knitr)
+
+result_folder = "../../Results/Human/"
+if (!file.exists(result_folder)) dir.create(result_folder, recursive=T)
+
+```
+
+# Overview over data used in this analysis
+
+```{r datasets, message=FALSE, results='hide'}
+ground_state_env <- new.env(parent = baseenv())
+load("../../Data/External/GroundState/analysis/Results/DGE_analysis_image.Rdata", envir=ground_state_env)
+
+load("../../Results/Human/DGE_analysis_image.Rdata")
+
+load("../../Results/Human/MB194_Human_gene_lists_and_signatures.Rdata")
+```
+
+```{r  message=FALSE}
+ed$ShortName_unique = paste(ed$ShortName, ed$patient_or_mouse_id, ed$Passage, sep="_")
+ed_MB194_shortname = ed
+rownames(ed_MB194_shortname) = ed_MB194_shortname$ShortName_unique
+```
+
+
+# Gene lists used in analysis
+
+```{r gene_sig_overview_1,  message=FALSE, fig.width=12, fig.height=8, fig.caption = "Gene Signature overview"}
+par(mar=c(15,4,4,2))
+barplot(sapply(all_gene_signatures, nrow), las=2, log="y", ylab="# of genes in list")
+```
+
+# Ecto and Endocervix organoids
+
+## Herfs SCJ signatures
+
+### SCJ Marker genes only
+
+#### Heatmaps
+
+```{r Herfs_SCJ_Markers,  message=FALSE, fig.width=12, fig.height=8}
+non_inf_samples = rownames(ed)
+sel_genes = all_gene_signatures[["Herfs SCJ markers and KRT5"]]
+rownames(sel_genes) = sel_genes$GeneSymbol
+
+norm_mat_sig_genes = normalized$E[normalized$genes$EntrezID %in% sel_genes$EntrezID, non_inf_samples]
+rownames(norm_mat_sig_genes) = normalized$genes[normalized$genes$EntrezID %in% sel_genes$EntrezID,"ProbeName"]
+colnames(norm_mat_sig_genes) = ed[colnames(norm_mat_sig_genes), "ShortName_unique"]
+
+rn2symbol = as.character(probename_to_symbol_agilent(rownames(norm_mat_sig_genes))$GeneSymbol)
+norm_mat_sig_genes_sorted2 = norm_mat_sig_genes[,order(colnames(norm_mat_sig_genes))]
+rn2symbol_sorted2 = as.character(probename_to_symbol_agilent(rownames(norm_mat_sig_genes_sorted2))$GeneSymbol)
+
+ed_sorted = ed_MB194_shortname[colnames(norm_mat_sig_genes_sorted2), ]
+col_names = colnames(norm_mat_sig_genes_sorted2)
+row_labels = probename_to_symbol_agilent(rownames(norm_mat_sig_genes_sorted2))$GeneSymbol
+breaks_new = c(-5, seq(-1,1,2/98), 5)
+pheatmap(norm_mat_sig_genes_sorted2, cluster_rows = T, cluster_cols = F, show_rownames = T, scale="row", main="Herfs SCJ Marker genes in ecto/endo organoids (outlier sample removed)", breaks=breaks_new, labels_col = col_names, labels_row = row_labels)
+
+pheatmap(norm_mat_sig_genes_sorted2, cluster_rows = T, cluster_cols = F, show_rownames = T, scale="none", main="Herfs SCJ Marker genes in ecto/endo organoids (outlier sample removed), absolute expr.", labels_col = col_names, labels_row = row_labels)
+
+```
+
+#### Boxplots 
+
+```{r SCJ_markers_boxplot_ecto_endo, echo=FALSE, results='asis', message=FALSE, fig.width=18, fig.height=10, eval=TRUE}
+# Median center expression values
+tmp = norm_mat_sig_genes_sorted2
+tmp2 = avereps(tmp, probename_to_symbol_agilent(rownames(tmp))$GeneSymbol)
+tmp2 = tmp2[c("CD63","KRT7","GDA","MMP7","AGR2","KRT5"),]
+nmat_scaled = t(scale(t(tmp2),scale=F, center = F))
+norm_mat_ts = melt(nmat_scaled)
+colnames(norm_mat_ts) = c("Gene","SampleID","Expression_Z_score")
+norm_mat_ts$EctoEndoClass = factor(ed_sorted[as.character(norm_mat_ts$SampleID),"Tissue.Type"], levels=c("Endo", "Ecto"))
+norm_mat_ts$Organoid.Type = factor(ed_sorted[as.character(norm_mat_ts$SampleID),"Organoid.Type"])
+norm_mat_ts$group2 = paste(norm_mat_ts$EctoEndoClass, norm_mat_ts$Organoid.Type)
+myScale = scale_fill_manual(name = "Tissue type", values =  c("Ecto"="red","Endo"="blue"), labels = c("Ecto"="Ecto","Endo"="Endo"))
+
+ggplot(data=norm_mat_ts ) + geom_boxplot(aes(x=EctoEndoClass, y = Expression_Z_score, fill=EctoEndoClass)) + facet_grid(. ~ Gene ) + myScale + theme(text = element_text(size=12), axis.text.x = element_text(angle=45, vjust=1, hjust = 1),strip.text.x = element_text(size = 12, colour = "black", angle = 0)) + xlab("Tissue Type") + ylab("Expression level")
+
+
+ggplot(data=norm_mat_ts ) + geom_boxplot(aes(x=EctoEndoClass, y = Expression_Z_score, fill=group2)) + facet_grid(. ~ Gene ) +  theme(text = element_text(size=12), axis.text.x = element_text(angle=45, vjust=1, hjust = 1),strip.text.x = element_text(size = 12, colour = "black", angle = 0)) + xlab("Tissue Type") + ylab("Expression level")
+
+SCJ_global_p_values = list()
+
+for (g in levels(factor(norm_mat_ts$Gene))) {
+  tmp = subset(norm_mat_ts, as.character(Gene)==g) 
+  res = wilcox.test(Expression_Z_score ~ EctoEndoClass, tmp)
+  SCJ_global_p_values[[g]] = res$p.value
+}
+
+res_df = t(as.data.frame(SCJ_global_p_values))
+colnames(res_df) = c("Mann-Whitney p-Value")
+kable(res_df, format = "markdown")
+```
+
+```{r supp_Fig_5_MB194_SCJ_markers_boxplot,  message=FALSE, fig.width=14, fig.height=8}
+par_orig = par()
+image_file = paste(result_folder, "Fig. 7c SCJ_Markers Boxplot.tiff" ,sep="/")
+tiff(image_file, width=12*100, height=8 * 100)
+
+myScale = scale_fill_manual(name = "Tissue type", values =  c("Ecto"="#f8766d","Endo"="#00bfc4"), labels = c("Ecto"="Ecto","Endo"="Endo"))
+
+ggplot(data=norm_mat_ts ) + geom_boxplot(aes(x=EctoEndoClass, y = Expression_Z_score, fill=EctoEndoClass)) + facet_grid(. ~ Gene ) + myScale + theme(panel.border = element_rect( colour = "black", fill=NA)) + theme(text = element_text(size=26), axis.text.x = element_text(size=30,angle=45, vjust=1, hjust = 1), axis.text.y = element_text(size=26), strip.text.x = element_text(size = 30, colour = "black", angle = 0), panel.grid.major = element_line(colour = "white"), panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank(), panel.grid.minor.y = element_blank()) + xlab("Tissue Type") + ylab("Expression level") + theme(plot.margin=unit(c(1,8,8,8),"cm"))
+
+dev.off()
+par(par_orig)
+```
+
+# Ectocervix organoids
+
+
+## Significant genes 2D / Early vs. Whole organoids
+
+### Fig 4E Version for paper without endo samples and using only genes that are significant in both 2D vs. Whole and Early vs. Whole, no proliferation associated genes
+
+```{r sig_genes_SC_MB194_HM_5,  message=FALSE, fig.width=12, fig.height=8}
+sel_samples = rownames(subset(ed, Tissue.Type != "Endo"))
+
+sel_genes = subset(all_gene_signatures[["MB194_SC_Vs_Diff_Ecto" ]], group==2)
+
+norm_mat_sig_genes = normalized$E[normalized$genes$EntrezID %in% sel_genes$EntrezID, sel_samples]
+rownames(norm_mat_sig_genes) = normalized$genes[normalized$genes$EntrezID %in% sel_genes$EntrezID,"ProbeName"]
+colnames(norm_mat_sig_genes) = ed[colnames(norm_mat_sig_genes), "ShortName_unique"]
+
+rn2symbol = as.character(probename_to_symbol_agilent(rownames(norm_mat_sig_genes))$GeneSymbol)
+norm_mat_sig_genes_sorted = norm_mat_sig_genes[order(sel_genes[rn2symbol,"logFC"], decreasing=T),order(colnames(norm_mat_sig_genes))]
+rn2symbol_sorted = as.character(probename_to_symbol_agilent(rownames(norm_mat_sig_genes_sorted))$GeneSymbol)
+
+row_anno = sel_genes[rn2symbol_sorted, c("logFC"), drop=F]
+rownames(row_anno) = rownames(norm_mat_sig_genes_sorted)
+row_anno$"Up/Down regulation" = ifelse(row_anno$logFC > 0, "Higher in 2D/Early", "Higher in Differentiated")
+row_anno[["logFC"]] = NULL
+
+anno_colors = list()
+anno_colors[["Up/Down regulation"]] = c("Higher in 2D/Early"="Red","Higher in Differentiated"="Blue")
+ed_sorted = ed_MB194_shortname[colnames(norm_mat_sig_genes_sorted), ]
+col_names = gsub("EarlyOrganoids", "Early Organoids", ed_sorted$Organoid.Type)
+breaks_new = c(-2, seq(-1,1,2/98), 2)
+par(mar=c(5,4,10,2))
+pheatmap(norm_mat_sig_genes_sorted[,c(1,2,3,5,4,6,7:10)], col = RedGreyBluePal3, cluster_rows = F, cluster_cols = F, show_rownames = F, scale="row", main=" ", breaks=breaks_new, annotation_row = row_anno, annotation_colors = anno_colors, labels_col = col_names, fontsize=20, fontsize_col = 24)
+```
+
+```{r sig_genes_SC_MB194_HM_5_TIFF,  message=FALSE, fig.width=12, fig.height=8}
+image_file = paste(result_folder, "Fig 4e 2D_Early_vs_Whole_common_genes_Heatmap_MB194_no_prolif.tiff" ,sep="/")
+tiff(image_file, width=12*100, height=8 * 100)
+par(mar=c(12,6,4,2))
+pheatmap(norm_mat_sig_genes_sorted[,c(1,2,3,5,4,6,7:10)], col = RedGreyBluePal3, cluster_rows = F, cluster_cols = F, show_rownames = F, scale="row", main=" ", breaks=breaks_new, annotation_row = row_anno, annotation_colors = anno_colors, labels_col = col_names, fontsize=20, fontsize_col = 25)
+dev.off()
+```
+
+### Final HM plots
+
+#### Fig. 4G heatmap
+
+```{r message=FALSE, fig.width=12, fig.height=10}
+
+final_gene_lists_for_hm = data.frame(genes=c("KREMEN2", "DKK1","DKK3", "DLL3", "MFNG", "JAG1","NOTCH2","NOTCH3","HES1","KAT2B","EFNA1","HDAC5","PSEN1"), group=factor(c("Wnt inhibitors", "Wnt inhibitors", "Wnt inhibitors", "Notch inducers", "Notch inducers", "Notch inducers", "Notch targets", "Notch targets", "Notch targets", "Notch targets", "Notch targets", "Notch targets", "Notch targets"), levels=c("Wnt inhibitors", "Notch inducers", "Notch targets")), stringsAsFactors = F)
+
+gene_list = final_gene_lists_for_hm$genes
+
+#sel_samples = rownames(subset(ed, (is.na(Infection.time.p.i.) | (Organoid.Type=="2D" & Infection=="Uninfected") ) & Tissue.Status == "Normal" & Tissue.Type=="Ecto" & !(scan_id == "H29")))
+sel_samples = rownames(subset(ed, Tissue.Type=="Ecto" ))
+
+norm_obj = normalized[normalized$genes$GeneSymbol %in% gene_list,]
+
+pnames = norm_obj$genes$ProbeName
+sig_probes = (pnames %in% subset(all_results[["ecto_2D_vs_whole_all"]], adj.P.Val < 0.3)$ProbeName) | (pnames %in% subset(all_results[["ecto_early_vs_whole_unpaired"]], adj.P.Val < 0.3)$ProbeName)
+
+norm_obj = norm_obj[sig_probes,]
+
+norm_mat = norm_obj$E[,sel_samples]
+rownames(norm_mat) = norm_obj$genes$ProbeName
+
+groups = factor( ed[colnames(norm_mat),"Organoid.Type"], levels=c("2D","EarlyOrganoids","Whole Organoid") ) 
+
+gene_order = 1:length(gene_list)
+names(gene_order) = gene_list
+gene_labels = norm_obj$genes$GeneSymbol
+
+norm_mat_aggregated = avereps(norm_mat, gene_labels)
+norm_mat_ordered = norm_mat_aggregated[order(gene_order[rownames(norm_mat_aggregated)]),order(groups)]
+
+row_labels = rownames(norm_mat_ordered)
+col_labels = as.character(groups[order(groups)])
+breaks_new = c(-5, seq(-0.5,0.5,1/98), 5)
+pheatmap(norm_mat_ordered[,c(1,2,3,4,6,5,7:10)], labels_row = row_labels, labels_col = col_labels, scale="row", cluster_rows = F, cluster_cols = F, breaks=breaks_new)
+
+par_orig = par()
+image_file = paste(result_folder, "Fig 4G_gene_heatmap.tiff" ,sep="/")
+par(mar=c(14,10,4,2))
+pheatmap(norm_mat_ordered[,c(1,2,3,4,6,5,7:10)], labels_row = row_labels, labels_col = col_labels, scale="row", cluster_rows = F, cluster_cols = F, breaks=breaks_new, filename = image_file, width=12, height = 8)
+par(par_orig)
+```
+
+
+#### Fig. 4a heatmap
+
+```{r message=FALSE, fig.width=12, fig.height=10}
+
+final_gene_lists_for_hm = list("Fig 2h"=c("ESR1","FZD5","FZD10","LRP12","LRP8","TCF7","AXIN2","DKK1","DKK3","KREMEN1"))
+
+gene_list = final_gene_lists_for_hm[["Fig 2h"]]
+
+sel_samples = rownames(subset(ed, Tissue.Type %in% c("Ecto","Endo") & Organoid.Type=="Whole Organoid"))
+#sel_samples = rownames(subset(ed, (is.na(Infection.time.p.i.) | (Organoid.Type=="2D" & Infection=="Uninfected") ) & Tissue.Status == "Normal" & Tissue.Type %in% c("Ecto","Endo") & !(scan_id == "H29")))
+
+norm_obj = normalized[normalized$genes$GeneSymbol %in% gene_list,]
+
+pnames = norm_obj$genes$ProbeName
+sig_probes = (pnames %in% subset(all_results[["ecto_vs_endo_whole"]], adj.P.Val < 0.1)$ProbeName)
+
+#sig_probes = rep(T,length(pnames))
+
+norm_obj = norm_obj[sig_probes,]
+
+norm_mat = norm_obj$E[,sel_samples]
+rownames(norm_mat) = norm_obj$genes$ProbeName
+
+groups = factor( ed[colnames(norm_mat),"Tissue.Type"], levels=c("Ecto","Endo") )
+#groups = factor( paste(ed[colnames(norm_mat),"Tissue.Type"], ed[colnames(norm_mat),"Organoid.Type"]), levels=c("Ecto 2D", "Ecto EarlyOrganoids", "Ecto Whole Organoid", "Endo 2D", "Endo Whole Organoid") ) 
+
+gene_order = 1:length(gene_list)
+names(gene_order) = gene_list
+gene_labels = norm_obj$genes$GeneSymbol
+
+norm_mat_aggregated = avereps(norm_mat, gene_labels)
+norm_mat_ordered = norm_mat_aggregated[order(gene_order[rownames(norm_mat_aggregated)]),order(groups)]
+
+row_labels = rownames(norm_mat_ordered)
+col_labels = as.character(groups[order(groups)])
+breaks_new = c(-5, seq(-1,1,2/98), 5)
+pheatmap(norm_mat_ordered, labels_row = row_labels, labels_col = col_labels, scale="row", cluster_rows = F, cluster_cols = F, breaks = breaks_new)
+```
+
+```{r}
+par_orig = par()
+image_file = file.path(result_folder, "Fig 2h gene_heatmap.png")
+par(mar=c(14,10,4,2))
+pheatmap(norm_mat_ordered, labels_row = row_labels, labels_col = col_labels, scale="row", cluster_rows = F, cluster_cols = F, breaks = breaks_new, fontsize_row = 40, fontsize_col = 40, fontsize = 30, filename = image_file, width=10, height=10)
+par(par_orig)
+```
+
+
+
+#### Fig. 4a heatmap
+
+```{r message=FALSE, fig.width=12, fig.height=10}
+
+final_gene_lists_for_hm = list("Fig 4a"=c("DLL1","DLL3","JAG1","NOTCH1","NOTCH2","NOTCH3","KAT2B","HES5","ID3","EFNA1"))
+
+gene_list = final_gene_lists_for_hm[["Fig 4a"]]
+
+sel_samples = rownames(subset(ed, Tissue.Type %in% c("Ecto","Endo") & Organoid.Type=="Whole Organoid"))
+#sel_samples = rownames(subset(ed, (is.na(Infection.time.p.i.) | (Organoid.Type=="2D" & Infection=="Uninfected") ) & Tissue.Status == "Normal" & Tissue.Type %in% c("Ecto","Endo") & !(scan_id == "H29")))
+
+norm_obj = normalized[normalized$genes$GeneSymbol %in% gene_list,]
+
+pnames = norm_obj$genes$ProbeName
+sig_probes = (pnames %in% subset(all_results[["ecto_vs_endo_whole"]], adj.P.Val < 0.1)$ProbeName)
+
+#sig_probes = rep(T,length(pnames))
+
+norm_obj = norm_obj[sig_probes,]
+
+norm_mat = norm_obj$E[,sel_samples]
+rownames(norm_mat) = norm_obj$genes$ProbeName
+
+groups = factor( ed[colnames(norm_mat),"Tissue.Type"], levels=c("Ecto","Endo") )
+#groups = factor( paste(ed[colnames(norm_mat),"Tissue.Type"], ed[colnames(norm_mat),"Organoid.Type"]), levels=c("Ecto 2D", "Ecto EarlyOrganoids", "Ecto Whole Organoid", "Endo 2D", "Endo Whole Organoid") ) 
+
+gene_order = 1:length(gene_list)
+names(gene_order) = gene_list
+gene_labels = norm_obj$genes$GeneSymbol
+
+norm_mat_aggregated = avereps(norm_mat, gene_labels)
+norm_mat_ordered = norm_mat_aggregated[order(gene_order[rownames(norm_mat_aggregated)]),order(groups)]
+
+row_labels = rownames(norm_mat_ordered)
+col_labels = as.character(groups[order(groups)])
+breaks_new = c(-5, seq(-1,1,2/98), 5)
+pheatmap(norm_mat_ordered, labels_row = row_labels, labels_col = col_labels, scale="row", cluster_rows = F, cluster_cols = F, breaks = breaks_new)
+```
+
+```{r}
+par_orig = par()
+image_file = file.path(result_folder, "Fig 4a gene_heatmap.png")
+par(mar=c(14,10,4,2))
+pheatmap(norm_mat_ordered, labels_row = row_labels, labels_col = col_labels, scale="row", cluster_rows = F, cluster_cols = F, breaks = breaks_new, fontsize_row = 40, fontsize_col = 40, fontsize = 30, filename = image_file, width=10, height=10)
+par(par_orig)
+```
+
+
+
+
+## Significant genes from GroundState data set on MB194 Ecto organoids
+
+### Genes from GroundState data that are significant in a large number of tissues
+
+These are genes defined above as GS_TOTAL, meaning that they have been found deregulated in a relevant proportion of all SC vs. Diff (ALI, Matrigel) comparisons (details see above). 
+
+
+```{r GS_top_genes_on_MB194_HM_global_only_up,  message=FALSE, fig.width=12, fig.height=8}
+
+#non_inf_samples = rownames(subset(ed, (is.na(Infection.time.p.i.) | (Organoid.Type=="2D" & Infection=="Uninfected") ) & Tissue.Status == "Normal" & Tissue.Type=="Ecto" & ShortName_unique != "Ecto__EarlyOrganoids_Uninfected_hc040_P1") )
+non_inf_samples = rownames(subset(ed, Tissue.Type=="Ecto") )
+sel_genes = subset(all_gene_signatures[["GS_TOTAL"]], Median_FC > 0)
+rownames(sel_genes) = sel_genes$EntrezID
+norm_mat_sig_genes = normalized$E[!is.na(normalized$genes$EntrezID) & (normalized$genes$EntrezID %in% sel_genes$EntrezID), non_inf_samples]
+rownames(norm_mat_sig_genes) = normalized$genes[normalized$genes$EntrezID %in% sel_genes$EntrezID,"ProbeName"]
+colnames(norm_mat_sig_genes) = paste(ed[colnames(norm_mat_sig_genes), "ShortName"], ed[colnames(norm_mat_sig_genes), "patient_or_mouse_id"], ed[colnames(norm_mat_sig_genes), "Passage"], sep="_")
+
+rn2entrez = as.character(probename_to_entrez_agilent(rownames(norm_mat_sig_genes))$EntrezID)
+norm_mat_sig_genes_sorted = norm_mat_sig_genes[order(sel_genes[rn2entrez,"Median_FC"], decreasing=T),order(colnames(norm_mat_sig_genes))]
+rn2entrez_sorted = as.character(probename_to_entrez_agilent(rownames(norm_mat_sig_genes_sorted))$EntrezID)
+
+row_anno = sel_genes[rn2entrez_sorted, c("Median_FC"), drop=F]
+rownames(row_anno) = rownames(norm_mat_sig_genes_sorted)
+row_anno$"Up/Down" = ifelse(row_anno$Median_FC > 0, "Higher in SC", "Higher in Differentiated" )
+row_anno[["logFC"]] = NULL
+
+anno_colors = list()
+#anno_colors = annotation_colors[["logFC"]] = brewer_pal("seq", 2)(5)[1:4]
+anno_colors[["Up/Down regulation"]] = c("Higher in SC"="Red","Higher in Differentiated"="Blue")
+
+breaks_new = c(-2, seq(-1,1,2/98), 2)
+pheatmap(norm_mat_sig_genes_sorted[,c(1,2,3,5,4,6,7:10)], col = RedGreyBluePal3, cluster_rows = F, cluster_cols=F,  scale="row", main = "Signif. SC vs. Diff genes in Ground State; MB194 Cervix organoids", breaks=breaks_new, show_rownames=F, annotation_row = row_anno)
+
+```
+
+```{r final_fig_2F,  message=FALSE, fig.width=12, fig.height=8}
+image_file = paste(result_folder, "Fig. 4f GS upregulated genes on MB194.tiff" ,sep="/")
+par(mar=c(12,6,4,2))
+pheatmap(norm_mat_sig_genes_sorted[,c(1,2,3,5,4,6,7:10)], col = RedGreyBluePal3, cluster_rows = F, cluster_cols=F,  scale="row", main = "", breaks=breaks_new, show_rownames=F, fontsize = 30, labels_col = ed_MB194_shortname[colnames(norm_mat_sig_genes_sorted),"Organoid.Type"], filename = image_file, width=12, height=8)
+
+```
+
+
+# Ectocervical squamous vs. Endocervical columnar
+
+
+```{r Ecto_vs_Endo_Helper,  message=FALSE, fig.width=12, fig.height=10}
+#### HELPER functions
+
+
+# Draws heatmap, expression barplot and fold change barplots (both all and FDR< 10%).
+# optionally stores TIFF image of final FC barplot
+# sel_genes must be a list of Entrez gene IDs
+ecto_vs_endo_plots = function(sel_genes, sel_samples, title, tiff=F) {
+
+  sel_genes = as.character(sel_genes)
+  
+  ### 1. Heatmap
+  norm_mat_sel_genes = normalized$E[normalized$genes$EntrezID %in% sel_genes, sel_samples]
+  rownames(norm_mat_sel_genes) = normalized$genes[normalized$genes$EntrezID %in% sel_genes,"GeneSymbol"]
+  colnames(norm_mat_sel_genes) = paste(ed[colnames(norm_mat_sel_genes), "ShortName"], ed[colnames(norm_mat_sel_genes), "patient_or_mouse_id"], ed[colnames(norm_mat_sel_genes), "Passage"], sep="_")
+  norm_mat_sel_genes_sorted = norm_mat_sel_genes[,order(colnames(norm_mat_sel_genes))]
+  
+  breaks_new = c(-2, seq(-1,1,2/98), 2)
+  pheatmap(norm_mat_sel_genes_sorted, cluster_rows = T, cluster_cols=F,  scale="row", main = title, breaks=breaks_new, show_rownames=T)
+  
+  #### Barplot
+  
+  nmsg_ts = melt(norm_mat_sel_genes)
+  nmsg_ts$Celltype = ifelse(grepl("^Ecto",nmsg_ts$Var2,perl=T), "Ectocervix","Endocervix")
+  nmsg_agg <- aggregate(nmsg_ts$value,
+      by = list(Celltype = nmsg_ts$Celltype, Gene = nmsg_ts$Var1),
+      FUN = function(x) c(mean = mean(x, na.rm=T), sd = sd(x, na.rm=T),
+                          n = sum(!is.na(x))))
+  nmsg_agg_fixed = cbind(nmsg_agg[,1:2], nmsg_agg$x)
+  nmsg_agg_fixed$se = nmsg_agg_fixed$sd/sqrt(nmsg_agg_fixed$n)
+  nmsg_agg_fixed = nmsg_agg_fixed[naturalorder(as.character(nmsg_agg_fixed$Gene)),]
+  nmsg_agg_fixed$Gene = factor(as.character(nmsg_agg_fixed$Gene), levels=naturalsort(unique(as.character(nmsg_agg_fixed$Gene))))
+  
+  limits <- aes(ymax = mean + se, ymin=mean - se)
+  dodge <- position_dodge(width=0.9)
+  p = ggplot(nmsg_agg_fixed, aes(fill=Celltype, y=mean, x=Gene)) + geom_bar(position=dodge, stat="identity") + geom_errorbar(limits, position=dodge, width=0.25) + theme(axis.text.x=element_text(angle=-90)) + ylab("Mean expression level") + labs(title=title)
+  plot(p)
+  
+  ####################################################################
+  #### Fold change barplot
+  
+  tmp = all_results[["ecto_vs_endo_whole"]]
+  ecto_vs_endo_sel = subset(tmp, as.character(EntrezID) %in% sel_genes)
+  ecto_vs_endo_sel_sorted = ecto_vs_endo_sel[order(ecto_vs_endo_sel$logFC, decreasing=F),]
+  par(mar=c(5,6,4,2))
+  bcol= ifelse(ecto_vs_endo_sel_sorted$adj.P.Val>0.1, "grey", ifelse(ecto_vs_endo_sel_sorted$logFC > 0, "red","blue"))
+  barplot(ecto_vs_endo_sel_sorted$logFC, names.arg = ecto_vs_endo_sel_sorted$GeneSymbol, las=2, cex.names=0.8, ylab="Log2 Fold change", col=bcol, main=title)
+  legend("topleft", legend=c("Significantly downregulated", "Not significant (FDR>=10%)", "Significant upregulated"), fill=c("blue","grey","red"))
+  ####################################################################
+  # FC barplot, significant genes only, dedupped
+  
+  ecto_vs_endo_sel = subset(tmp, as.character(EntrezID) %in% sel_genes & adj.P.Val < 0.1)
+  ecto_vs_endo_sel_dedup = dedup_DGE_results(ecto_vs_endo_sel, by="pvalue", logfc_col = "logFC", pval_col = "P.Value", adjp_col = "adj.P.Val", id_col = "GeneSymbol", probeid_col="ProbeName") 
+  ecto_vs_endo_sel_sorted = ecto_vs_endo_sel_dedup[order(ecto_vs_endo_sel_dedup$logFC, decreasing=F),]
+  
+  par(mar=c(12,6,4,2))
+  bcol= ifelse(ecto_vs_endo_sel_sorted$adj.P.Val>0.1, "grey", ifelse(ecto_vs_endo_sel_sorted$logFC > 0, "red","blue"))
+  barplot(ecto_vs_endo_sel_sorted$logFC, names.arg = ecto_vs_endo_sel_sorted$GeneSymbol, las=2, cex.names=2, cex.axis = 2, ylab="", col=bcol, main=title, ylim=c(-7, 7))
+  mtext("Log2 Fold change", side=2, cex=2, line=3.4)
+  #legend("topleft", legend=c("Significantly downregulated", "Significantly upregulated"), fill=c("blue","red"), cex=1.3)
+  ####################################################################
+  if(tiff) {
+    par_orig = par()
+    image_file = paste(result_folder, paste(title,"_FC_Barplot_MB194.tiff",sep="") ,sep="/")
+    tiff(image_file, width=12*100, height=8 * 100)
+    par(mar=c(16,10,4,2))
+    bp=barplot(ecto_vs_endo_sel_sorted$logFC, names.arg = "", las=2, cex.names=3, cex.axis = 3, ylab="", col=bcol, main=title, ylim=c(min(ecto_vs_endo_sel_sorted$logFC)-4, max(ecto_vs_endo_sel_sorted$logFC)+2))
+    mtext("log2 Fold change", side=2, cex=3, line=4.5)
+    axis(1,at=bp,labels=ecto_vs_endo_sel_sorted$GeneSymbol, hadj=0, las=2, cex.axis = 3, tick=F, lwd=1, line=8) 
+    dev.off()
+    par(par_orig)
+  }
+}
+```
+
+
+
+### Selected genes - All Cytokeratins
+
+```{r Final_Fig_3_x1,  message=FALSE, fig.width=12, fig.height=10}
+sel_samples = rownames(ed)
+sel_genes = normalized$genes[grep("^KRT[0-9]+[A-Z]*$",normalized$genes$GeneSymbol, perl=T), "EntrezID"]
+sel_genes = sel_genes[!is.na(sel_genes)]
+gs = "Cytokeratins"
+
+ecto_vs_endo_plots(sel_genes, sel_samples, gs, tiff=T )
+```
+
+
+# Ground State data from McKeon group
+
+Data is from several data published experiments from the McKeon lab, measured on y Affymetrix HuExon array. Sample information is specified in genome2 in the public data folder *GroundState*, file ExpDesign.xls. All arrays were processed and normalized together using the core transcript cluster set. producing roughly one gene expression measure per gene. 
+
+```{r GroundState_data,  message=FALSE}
+genv = ground_state_env
+ed_ground_state = get("ed", genv )
+#sel_samples = c(get("intestinal_ft_samples", genv), get("airway_samples", genv))
+sel_samples = as.character(subset(ed_ground_state, culture != "tissue (LCM)" & !(cell_type %in% c("Barretts","Gastric Cardia")) & geo_data_set != "GSE49292")$sample_id)
+
+dmat = get("data_mat", genv)[,sel_samples]
+suppressMessages(library("huex10sttranscriptcluster.db"))
+anno = select(huex10sttranscriptcluster.db, keys=as.character(rownames(dmat)), keytype="PROBEID", columns=c("ENTREZID","GENENAME","SYMBOL"))
+
+am = reshape2::melt(anno, id.vars = "PROBEID")
+anno_unique = reshape2::dcast(am, PROBEID ~ variable, fun.aggregate = function(x) paste(x, collapse=","))
+rownames(anno_unique)  = as.character(anno_unique$PROBEID)
+anno_dmat = anno_unique[rownames(dmat),]
+
+```
+
+
+
+### Shared genes between MB194 and GS SC vs. Diff
+
+```{r,  message=FALSE, fig.width=14, fig.height=14}
+sel_samples = as.character(subset(ed_ground_state, culture != "tissue (LCM)" & !(cell_type %in% c("Barretts","Gastric Cardia")) & geo_data_set != "GSE49292")$sample_id)
+
+sel_genes = rbind(analysis_defined_signatures[["gs_global_and_MB194_sc_vs_diff_shared_up"]], analysis_defined_signatures[["gs_global_and_MB194_sc_vs_diff_shared_down"]])
+sel_genes$"Up/Down" = c(rep("Higher in SC", nrow(analysis_defined_signatures[["gs_global_and_MB194_sc_vs_diff_shared_up"]])), rep("Higher in Differentiated", nrow(analysis_defined_signatures[["gs_global_and_MB194_sc_vs_diff_shared_down"]])))
+rownames(sel_genes) = sel_genes$EntrezID
+
+norm_mat_sig_genes = dmat[anno_dmat$ENTREZID %in% sel_genes$EntrezID, sel_samples]
+rownames(norm_mat_sig_genes) = anno_dmat[anno_dmat$ENTREZID%in% sel_genes$EntrezID,"PROBEID"]
+ee = ed_ground_state[colnames(norm_mat_sig_genes),]
+ee$sample_id_hm = paste(ee$organ, ee$cell_type, ee$cell_state,sep="_")
+ct_abbrev = c("Barretts"="BA","Colon ascendens"="CA","Colon descendens"="CD","Colon transversum"="CT","Distal airway epithelium"="DA","Duodenum"="DD","Esophagus"="ES","FT epithelium"="FT","Gastric Cardia"="GC","Ileum"="IL","Jejunum"="JJ","Krt5+ fetal esophagus"="K5","Krt7+ fetal esophagus"="K7","Nasal turbinate epithelium"="NT","Tracheobronchial epithelia"="TB")
+ee$cell_type_short = ct_abbrev[ee$cell_type]
+
+rn2entrez = as.character(anno_dmat[rownames(norm_mat_sig_genes),"ENTREZID"])
+norm_mat_sig_genes_sorted = norm_mat_sig_genes[order(sel_genes[rn2entrez,"Up/Down"], decreasing=T),order(ee[colnames(norm_mat_sig_genes),"sample_id_hm"])]
+rn2entrez_sorted = as.character( as.character(anno_dmat[rownames(norm_mat_sig_genes_sorted),"ENTREZID"]))
+
+row_anno = sel_genes[rn2entrez_sorted, c("Up/Down"), drop=F]
+rownames(row_anno) = rownames(norm_mat_sig_genes_sorted)
+
+anno_colors = list()
+#anno_colors = annotation_colors[["logFC"]] = brewer_pal("seq", 2)(5)[1:4]
+anno_colors[["Up/Down"]] = c("Higher in SC"="Red","Higher in Differentiated"="Blue")
+anno_colors[["Cell.type"]] = c("SC"="orchid","Differentiated"="cyan2")
+
+col_anno = data.frame("Cell.type" = ifelse(ee[colnames(norm_mat_sig_genes_sorted),]$cell_state=="SC", "SC","Differentiated"))
+rownames(col_anno) = colnames(norm_mat_sig_genes_sorted)
+
+nmat_scaled = t(scale(t(norm_mat_sig_genes_sorted)))
+nmat_scaled[abs(nmat_scaled) > 2] <- sign(nmat_scaled[abs(nmat_scaled) > 2]) * 2
+breaks_new = c(-2, seq(-1,1,2/98), 2)
+# pheatmap(nmat_scaled, scale="none", cluster_rows = F, cluster_cols = F, main = "Signif. genes in Early/2D vs. Whole organoids, GroundState", annotation_row = row_anno, annotation_colors = anno_colors, labels_row =  as.character(anno_dmat[rownames(nmat_scaled),"SYMBOL"]), annotation_col = col_anno, labels_col = ee[colnames(nmat_scaled),"cell_type_short"])
+
+GS_MB194_shared_mat_for_export = list("mat"=norm_mat_sig_genes_sorted, "ed"=ee, "anno"=anno_dmat)
+```
+ 
+
+```{r Final_Fig_2a_alternative2,  message=FALSE, fig.width=14, fig.height=14}
+
+#organ_site_order = c("Barretts"=1,"Esophagus"=2,"Krt5+ fetal esophagus"=3,"Krt7+ fetal esophagus"=4,"Gastric Cardia"=5,"Duodenum"=6,"Jejunum"=7,"Ileum"=8,"Colon ascendens"=9,"Colon transversum"=10,"Colon descendens"=11,"Nasal turbinate epithelium"=21,"Tracheobronchial epithelia"=22, "Distal airway epithelium"=23, "FT epithelium"=15)
+organ_site_order = c("Esophagus"=2,"Krt5+ fetal esophagus"=3,"Krt7+ fetal esophagus"=4,"Duodenum"=6,"Jejunum"=7,"Ileum"=8,"Colon ascendens"=9,"Colon transversum"=10,"Colon descendens"=11,"Nasal turbinate epithelium"=21,"Tracheobronchial epithelia"=22, "Distal airway epithelium"=23, "FT epithelium"=15)
+sample_order = naturalorder(paste(ifelse(ed_ground_state[colnames(nmat_scaled),"cell_state"]=="SC","SC","Diff"), organ_site_order[ed_ground_state[colnames(nmat_scaled),"cell_type"]]))
+
+within_block_orders = list()
+for (g in levels(factor(row_anno$`Up/Down`))) {
+  rr = rownames(subset(row_anno, row_anno$`Up/Down`==g))
+  dd = hclust(dist(nmat_scaled[rr,]))
+  #pheatmap(nmat_scaled[rr,sample_order], cluster_rows=T, cluster_cols=F, labels_row =  as.character(anno_dmat[rr,"SYMBOL"]))
+  within_block_orders[[g]] = dd
+}
+
+new_row_order = do.call(rbind, Map(function(x, n) data.frame(rowid=x$labels[x$order], order=1:length(x$order), group=n, stringsAsFactors = F), within_block_orders, names(within_block_orders)) )
+new_row_order = new_row_order[order(ifelse(new_row_order$group=="Higher in SC", 1, 2), new_row_order$order),]
+
+nmat_scaled_ordered = nmat_scaled[new_row_order$rowid,sample_order]
+pheatmap(nmat_scaled_ordered, scale="none", cluster_rows = F, cluster_cols = F, main = "Signif. genes in Early/2D vs. Whole organoids, GroundState", annotation_row = row_anno, annotation_colors = anno_colors, labels_row =  as.character(anno_dmat[rownames(nmat_scaled_ordered),"SYMBOL"]), annotation_col = col_anno, labels_col = ee[colnames(nmat_scaled_ordered),"cell_type_short"])
+```
+
+```{r message=FALSE, fig.width=12, fig.height=8}
+image_file = paste(result_folder, "Supp Fig 6c Shared genes GS and MB194 Ecto.tiff" ,sep="/")
+par(mar=c(12,6,4,2))
+
+nmat_scaled_ordered = nmat_scaled[new_row_order$rowid,sample_order]
+pheatmap(nmat_scaled_ordered, scale="none", cluster_rows = F, cluster_cols = F, main = "Signif. genes in Early/2D vs. Whole organoids, GroundState", annotation_row = row_anno, annotation_colors = anno_colors,  annotation_col = col_anno, show_rownames = F, labels_col = ee[colnames(nmat_scaled_ordered),"cell_type_short"], fontsize_row = 20, fontsize_col=20, fontsize=24, filename = image_file, width=24, height=8)
+#labels_row =  as.character(anno_dmat[rownames(nmat_scaled_ordered),"SYMBOL"]),
+
+```
+
+# Software versions
+
+```{r}
+sessionInfo()
+```
+

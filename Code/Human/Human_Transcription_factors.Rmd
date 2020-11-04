@@ -1,0 +1,103 @@
+---
+title: "MB194 Human Transcription factors"
+output: 
+ html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: false
+    number_sections: true
+    code_folding: hide
+    
+pdf_document:
+    fig_caption: true
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Hilmar Berger"
+---
+
+```{r init,  message=FALSE}
+rm(list=ls())
+source("Helper_functions.R")
+library(reshape2)
+library(pheatmap)
+library(gplots)
+library(impute)
+library(gplots)
+library(RColorBrewer)
+library(naturalsort)
+library(ggplot2)
+library(data.table)
+
+result_folder = "../../Results/Human"
+if (!file.exists(result_folder)) dir.create(result_folder, recursive=T)
+
+```
+
+```{r datasets, echo=TRUE, results='hide', message=FALSE}
+load("../../Results/Human/DGE_analysis_image.Rdata")
+name_trans = c("early_vs_whole_unpaired"="ecto_early_vs_whole_unpaired", "ground_state_vs_whole_all"="ecto_2D_vs_whole_all", "ecto_vs_endo"="ecto_vs_endo_whole")
+names(all_results) = ifelse(names(all_results) %in% names(name_trans), name_trans[names(all_results)], names(all_results))
+
+load("../../Results/Human/MB194_Human_gene_lists_and_signatures.Rdata")
+
+```
+
+
+# TF motif enrichment results for SC vs Diff results
+
+## GSEA pre-ranked analysis results
+
+### Ecto organoids
+
+Those are the results from running GSEA on MSigDB C3 Motif genesets for the comparisons *ecto_early_vs_whole_unpaired* and *ecto_2D_state_vs_whole_all*. Results represent the -log10(min(nominal p-value)) for each transcription factor, i.e. the lowest p-value is selected if several gene sets for the same TF exist. Gene sets not listed in the GSEA results will be set to p-value = 1. Only gene sets that reach FDR < 5% in any of the comparisons are included.
+
+```{r GSEA_motif,  message=FALSE, fig.width=10, fig.height=14}
+sel_analysis = c("early_vs_whole_unpaired_up", "ground_state_vs_whole_all_up","early_vs_whole_unpaired_down", "ground_state_vs_whole_all_down")
+all_sig_motifs = c()
+for (n in sel_analysis) {
+  tmp = subset(GSEA_motif_results_SC_vs_diff[[n]], FDR.q.val < .05)
+  all_sig_motifs = c(all_sig_motifs, tmp$NAME)
+}
+
+all_sig_motifs_unique = unique(all_sig_motifs)
+all_sig_motifs_unique_GSEA_sc_vs_diff = all_sig_motifs_unique
+
+all_gsea = list()
+for (n in sel_analysis) {
+  tmp = subset(GSEA_motif_results_SC_vs_diff[[n]], NAME %in% all_sig_motifs_unique)
+  rownames(tmp) = tmp$NAME
+  tmp2 = tmp[,c("NOM.p.val","NAME"), drop=F]
+  #colnames(tmp2) = n
+  tmp2$Comp = n
+  all_gsea[[n]] = tmp2
+}
+
+all_gsea_tab = do.call(rbind, all_gsea)
+all_gsea_tab$fixed_name = gsub("^V\\$","", all_gsea_tab$NAME)
+all_gsea_tab$TF_name = ifelse(grepl("^V\\$", all_gsea_tab$NAME, perl=T) & grepl("_", all_gsea_tab$NAME), substr(all_gsea_tab$fixed_name, 1, as.vector(regexpr("_", all_gsea_tab$fixed_name))-1), all_gsea_tab$NAME)
+
+all_gsea_mat2_tmp = reshape2::dcast(all_gsea_tab, TF_name ~ Comp, value.var="NOM.p.val" ,fun.aggregate=min, na.rm=T)
+all_gsea_mat2 = as.matrix(all_gsea_mat2_tmp[,colnames(all_gsea_mat2_tmp) != "TF_name"])
+rownames(all_gsea_mat2) = all_gsea_mat2_tmp$TF_name
+all_gsea_mat2[is.na(all_gsea_mat2) | is.infinite(all_gsea_mat2)] <- 1
+all_gsea_mat2[all_gsea_mat2 == 0] <- 1e-3
+p_score_mat2 = -log10(all_gsea_mat2)
+
+TF_mat = p_score_mat2[!grepl("MIR-", rownames(p_score_mat2)) & !grepl("UNKNOWN", rownames(p_score_mat2)) & !grepl("_V\\$", rownames(p_score_mat2)),]
+pheatmap(TF_mat, scale="none", cluster_cols = T, fontsize_row = 10)
+```
+
+```{r TF_GSEA_Ecto_TIFF,  message=FALSE, fig.width=12, fig.height=8}
+TF_ordered_list = c("NF1","LBP1","FREAC2","FREAC4","CREB","ETS1","ETS","NERF","ELK1","SRF","E2F","E2F1","E2F1DP1","E2F1DP1RB","E2F1DP2","E2F4DP1","E2F4DP2","MAX","MYC","MYCMAX","AP1","AP2","USF","USF2","NRF1","NRF2","NFE2","ARNT","ATF","BACH1","CETS1P54","ERR1","GABP","GATA2","NFMUE1","NFY","NMYC","PAX5","PAX6","PPARG","SF1","STAT1","TCF11MAFG","WHN","YY1","ZF5")
+
+image_file = file.path(result_folder, "Fig 4j TF enrichment heatmap.tiff")
+par(mar=c(12,6,4,2))
+TF_mat_ordered = TF_mat[TF_ordered_list,]
+pheatmap(TF_mat_ordered, scale="none", cluster_cols = T, cluster_rows = F, fontsize_row=20, fontsize_col=20, fontsize = 20, legend_breaks = c(0,1,2,3), labels_col = c("Early vs Diff Down", "Early vs Diff Up",  "2D vs Diff Down","2D vs Diff Up") , filename = image_file, width=12, height=18)
+```
+
+# Software versions
+
+```{r}
+sessionInfo()
+```
+

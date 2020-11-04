@@ -1,0 +1,339 @@
+---
+title: "GroundState_Affymetrix_analysis.Rmd"
+author: "Hilmar Berger"
+output:
+ html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: false
+    number_sections: true
+    code_folding: hide
+    
+pdf_document:
+    fig_caption: true
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M:%S')`"
+---
+
+```{r, messages=FALSE}
+rm(list=ls())
+library(data.table)
+library(reshape2)
+library(limma)
+library(xlsx)
+library(pheatmap)
+library(GSA)
+library(xtable)
+library(gplots)
+library(impute)
+
+#source("https://bioconductor.org/biocLite.R")
+#biocLite("huex10sttranscriptcluster.db")
+suppressMessages(library("huex10sttranscriptcluster.db"))
+
+rma_summary = fread("../Preprocessing/output_affy/rma-sketch.summary.txt", skip="probeset_id")
+rma_report = fread("../Preprocessing/output_affy/rma-sketch.report.txt", skip="cel_files", sep="\t")
+
+ed = read.table("ExpDesign.txt", sep="\t", header=T, quote="", as.is=T)
+rownames(ed) = ed$sample_id
+
+anno = select(huex10sttranscriptcluster.db, keys=as.character(rma_summary$probeset_id), keytype="PROBEID", columns=c("ENTREZID","GENENAME","SYMBOL"))
+
+am = melt(anno, id.vars = "PROBEID")
+anno_unique = dcast(am, PROBEID ~ variable, fun.aggregate = function(x) paste(x, collapse=","))
+
+data_mat = as.matrix(rma_summary[,2:ncol(rma_summary), with=F])
+rownames(data_mat) = as.character(rma_summary$probeset_id)
+
+result_folder = "./Results/"
+if (!file.exists(result_folder)) dir.create(result_folder, recursive=T)
+
+```
+
+# Basic QC
+
+## RLE plots across arrays
+```{r, echo=FALSE, results='hide', messages=FALSE}
+# there are some stronger batch effects
+plot(rma_report$all_probeset_rle_mean, pch=20, col=as.numeric(as.factor(ed[rma_report$cel_files,]$geo_data_set)), xlab="sample", ylab="Mean RLE")
+```
+
+## MDS
+
+```{r, MDS, echo=FALSE, fig.width=8, fig.height=8}
+cp = palette(rainbow(8))
+data_inp = t(data_mat) 
+
+d <- dist(data_inp) # euclidean distances between the rows
+fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
+
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+cc = cp[as.numeric(factor(paste(ed[rownames(data_inp),]$organ, ed[rownames(data_inp),]$cell_type, ed[rownames(data_inp),]$phenotype)))]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2", main="Metric MDS, all samples", type="n", ylim=c(min(y)-50, max(y)+50), xlim=c(min(x)-50, max(x)+200))
+points(x, y, col=cc, pch=20)
+text(x,y,labels=paste(ed[rownames(data_inp),]$name), col=cc, cex=.8, pos=4)
+
+
+
+cc = cp[as.numeric(factor(paste(ed[rownames(data_inp),]$geo_data_set)))]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2", main="Metric MDS, all samples, color by data set", type="n", ylim=c(min(y)-50, max(y)+50), xlim=c(min(x)-50, max(x)+200))
+points(x, y, col=cc, pch=20)
+#text(x,y,labels=ed[rownames(data_inp),]$sample_ID, col=cp[as.numeric(factor(ed[rownames(data_inp),]$Tissue.Status))])
+text(x,y,labels=paste(ed[rownames(data_inp),]$geo_data_set), col=cc, cex=.8, pos=4)
+
+```
+
+Conclusion from MDS: Strong clustering of datasets, with LCM-tissue datasets vs. in-vitro dominating Coordinate 1 and airways vs. intestinal data sets dominating Coordinate 2. We should exclude the LCM samples and do a separate analysis on airway cells.
+
+## Differential expression overview
+
+```{r, dge_analysis, echo=FALSE, results='hide'}
+airway_samples = subset(ed, organ=="airways/lung")$sample_id
+intestinal_ft_samples = subset(ed, organ %in% c("intestine", "fallopian tube") & culture == "in-vitro" )$sample_id
+
+airway_mat = data_mat[,airway_samples]
+intestinal_ft_mat = data_mat[,intestinal_ft_samples]
+
+ed_airway = ed[airway_samples,]
+ed_intestinal_ft = ed[intestinal_ft_samples,]
+
+suppressMessages(library("huex10sttranscriptcluster.db"))
+anno = select(huex10sttranscriptcluster.db, keys=as.character(rownames(data_mat)), keytype="PROBEID", columns=c("ENTREZID","GENENAME","SYMBOL"))
+
+am = melt(anno, id.vars = "PROBEID")
+anno_unique = dcast(am, PROBEID ~ variable, fun.aggregate = function(x) paste(x, collapse=","))
+rownames(anno_unique)  = as.character(anno_unique$PROBEID)
+
+```
+
+Comparisons performed: 
+
+```{r, dge_analysis2, echo=FALSE, results='hide'}
+# remove duplicate and control probes before DE
+# FIXME: Consider averaging the duplicated probes. This affects about 2600 genic probes out of 5500 duplicated probes on a 60k human array
+
+rsd = apply(data_mat,1,sd,na.rm=T)
+rmean = apply(data_mat,1,mean,na.rm=T)
+cofvar = rsd/rmean
+low_var_flag =  cofvar < quantile(cofvar,na.rm=T, p=c(0.5))
+low_var_flag = rep(F, length(cofvar))
+
+na_cnt_per_row = apply(data_mat, 1, function(x) sum(is.na(x)))
+
+all_results = list()
+all_fits = list()
+all_designs = list()
+
+```
+
+```{r, dge_analysis_intestinal_ft, echo=FALSE, results='hide'}
+# LIMMA user guide 9.5.2
+TS = factor(make.names(paste(ed_intestinal_ft$geo_data_set, ed_intestinal_ft$cell_type, ed_intestinal_ft$cell_state, ed_intestinal_ft$organ, sep="_")))
+
+edata = intestinal_ft_mat
+design = model.matrix(~ 0 + TS)
+colnames(design) = levels(TS)
+fit <- lmFit(edata, design)
+
+cont.matrix <- makeContrasts( Barretts_SC_vs_ALI = GSE65013_Barretts_SC_intestine - GSE65013_Barretts_ALI_intestine, 
+                              ColonAsc_SC_vs_ALI = GSE57584_Colon.ascendens_SC_intestine - GSE57584_Colon.ascendens_ALI_intestine ,
+                              ColonDesc_SC_vs_ALI = GSE57584_Colon.descendens_SC_intestine -  GSE57584_Colon.descendens_ALI_intestine,
+                              ColonTrans_SC_vs_ALI = GSE57584_Colon.transversum_SC_intestine - GSE57584_Colon.transversum_ALI_intestine,
+                              Duodenum_SC_vs_ALI = GSE57584_Duodenum_SC_intestine - GSE57584_Duodenum_ALI_intestine,
+                              Jejunum_SC_vs_ALI =  GSE57584_Jejunum_SC_intestine - GSE57584_Jejunum_ALI_intestine,
+                              Ileum_SC_vs_ALI = GSE57584_Ileum_SC_intestine - GSE57584_Ileum_ALI_intestine,
+                              GastricCardia_SC_vs_ALI = GSE65013_Gastric.Cardia_SC_intestine -  GSE65013_Gastric.Cardia_ALI_intestine,
+                              Esophagus_SC_vs_ALI = GSE65013_Esophagus_SC_intestine - GSE65013_Esophagus_ALI_intestine,
+                              Krt5_fetal_esophagus_SC_vs_ALI = GSE65013_Krt5..fetal.esophagus_SC_intestine - GSE65013_Krt5..fetal.esophagus_ALI_intestine,
+                              Krt7_fetal_esophagus_SC_vs_ALI = GSE65013_Krt7..fetal.esophagus_SC_intestine - GSE65013_Krt7..fetal.esophagus_ALI_intestine,
+                              FallopianTube_SC_vs_ALI = GSE69453_FT.epithelium_SC_fallopian.tube - GSE69453_FT.epithelium_ALI_fallopian.tube,
+                              levels=design )
+fit2 <- contrasts.fit(fit, cont.matrix)
+fit2 <- eBayes(fit2)
+
+
+for (c in colnames(cont.matrix)) {
+  res = topTable(fit2, coef=c, adjust="BH", number=nrow(edata))
+  res_anno = merge(res, anno_unique, by.x=0, by.y="PROBEID", all.x=T, sort=F)
+  all_results[[c]] = res_anno
+}
+
+all_fits[["global_model"]] = fit2
+all_designs[["global_model"]] = list(samples=rownames(ed_intestinal_ft), details=list(TS = TS), design = design, global=T, cont.matrix = cont.matrix)
+
+```
+
+```{r, dge_analysis_airway, echo=FALSE, results='hide'}
+
+# LIMMA user guide 9.5.2
+TS = factor(make.names(paste(ed_airway$geo_data_set, ed_airway$cell_type, ed_airway$cell_state, ed_airway$organ, sep="_")))
+
+edata = airway_mat
+design = model.matrix(~ 0 + TS)
+colnames(design) = levels(TS)
+fit <- lmFit(edata, design)
+
+cont.matrix <- makeContrasts( Distal_airway_SC_vs_ALI = GSE32604_Distal.airway.epithelium_SC_airways.lung - GSE32604_Distal.airway.epithelium_ALI_airways.lung,
+                              Nasal_airway_SC_vs_ALI = GSE32604_Nasal.turbinate.epithelium_SC_airways.lung -  GSE32604_Nasal.turbinate.epithelium_ALI_airways.lung, 
+                              Tracheobronchial_SC_vs_ALI = GSE32604_Tracheobronchial.epithelia_SC_airways.lung - GSE32604_Tracheobronchial.epithelia_ALI_airways.lung, 
+                              Distal_airway_SC_vs_Matrigel = GSE32604_Distal.airway.epithelium_SC_airways.lung - GSE32604_Distal.airway.epithelium_Matrigel_airways.lung,
+                              Nasal_airway_SC_vs_Matrigel = GSE32604_Nasal.turbinate.epithelium_SC_airways.lung - GSE32604_Nasal.turbinate.epithelium_Matrigel_airways.lung, 
+                              Tracheobronchial_SC_vs_Matrigel = GSE32604_Tracheobronchial.epithelia_SC_airways.lung - GSE32604_Tracheobronchial.epithelia_Matrigel_airways.lung,
+                              levels=design )
+fit2 <- contrasts.fit(fit, cont.matrix)
+fit2 <- eBayes(fit2)
+
+
+for (c in colnames(cont.matrix)) {
+  res = topTable(fit2, coef=c, adjust="BH", number=nrow(edata))
+  res_anno = merge(res, anno_unique, by.x=0, by.y="PROBEID", all.x=T, sort=F)
+  all_results[[c]] = res_anno
+}
+
+all_fits[["global_model2"]] = fit2
+all_designs[["global_model2"]] = list(samples=rownames(ed_airway), details=list(TS = TS), design = design, global=T, cont.matrix = cont.matrix)
+
+```
+
+
+### Volcano plots
+
+For each comparison, the distribution of the fold change (on a log2 scale) and adjusted p-value (on reverse logarithmical scale) is shown in a volcano plot. The red line denotes the FDR cutoff of 0.05. 
+
+```{r, DE_volcano, echo=FALSE, results="hide", fig.width=16,fig.height = 18 }
+all_target_conditions = names(all_results)
+par(mfrow=c(4,5))
+for (tc in all_target_conditions) {
+  r = all_results[[tc]]
+  plot(r$logFC, -log10(r$adj.P.Val),xlab="log2 Fold Change",ylab="-log10(adj. p-val)", ylim=c(0,max(2,max(-log10(r$adj.P.Val),na.rm=T))))
+  title(main=tc, sub=paste("(",nrow(subset(r, adj.P.Val < 0.05))," signif. DE genes)",sep="") )
+  abline(h=-log10(0.05),col="red")
+  
+}
+```
+
+
+### Overlaps between significantly expressed gene lists
+
+The following table describes the overlap (intersection) of the list of differentially expressed genes between any two comparisons of a target condition to control.  
+The Jaccard coefficient defines the ratio of the overlap size to the size of the union of both lists. 
+
+```{r, overlaps, echo=FALSE, results="hide"}
+# OVERLAPS between clones
+
+#library(VennDiagram)
+#v1 = venn.diagram(signif_genes_list, filename="./venn.tiff" )
+
+signif_genes_list = lapply(all_results, function(x) {subset(x,adj.P.Val<0.05)$SYMBOL})
+combinations = combn(names(signif_genes_list),2)
+pairwise_intersections = apply(combinations,2, function(x) { intersect(signif_genes_list[[x[1]]], signif_genes_list[[x[2]]])} )
+d = as.data.frame(t(combinations))
+d$overlap = lapply(pairwise_intersections, length)
+comp_names = names(signif_genes_list)
+d_mat = matrix(NA, nrow=length(comp_names), ncol=length(comp_names))
+colnames(d_mat) = comp_names
+rownames(d_mat) = comp_names
+tmp = apply(d, 1, function(x) {x = as.vector(unlist(x)); d_mat[ x[1],x[2] ] <<- as.numeric(x[3]); d_mat[ x[2],x[1] ] <<- as.numeric(x[3]) })
+rm(tmp)
+ll = unlist(lapply(signif_genes_list, length))
+for (n in names(ll)) d_mat[n, n] <- ll[n]
+
+totals_m = matrix(rep(ll, times=nrow(d_mat)), nrow(d_mat), ncol(d_mat))
+d_mat_prop = d_mat/totals_m
+
+d$pairwise_union_lengths = apply(combinations,2, function(x) { length(union(signif_genes_list[[x[1]]], signif_genes_list[[x[2]]]))} )
+d$jaccard_coef = as.numeric(d$overlap)/d$pairwise_union_lengths
+```
+
+```{r, DE_overlap_tab, echo=FALSE, results="asis"}
+d_t = d[,c(1,2,3,5)]
+colnames(d_t) = c("Condition_1", "Condition_2", "Overlap of DE genes", "Jaccard coefficient")
+print.xtable(xtable(d_t,display=c("s","s","s","d","g"), align="|l|l|l|l|l|"), type="html", file="" , include.rownames=F)
+```
+
+
+The heatmap below shows the overlap (intersection) of the list of differentially expressed genes between any two comparisons of a target condition to control. The diagonal shows the size of the individual list of differentially expressed genes for a comparison. Values are depicted on a log10 scale (i.e. 2 = overlap of 100 genes and so on).
+
+```{r, DE_overlap_heatmap, fig.height=8}
+pheatmap(log10(d_mat+1))
+```
+
+
+```{r, DE_combined, echo=FALSE, results="hide"}
+###############################################################################################################
+# Write Result Files
+###############################################################################################################
+
+all_DE_results_tmp = list()
+for (tc in all_target_conditions) {
+  tmp = all_results[[tc]]
+  tmp$condition = tc
+  all_DE_results_tmp[[tc]] = tmp
+}
+all_DE_results_ts = do.call(rbind, all_DE_results_tmp)
+#all_DE_results_ts$DE_class = ifelse(all_DE_results_ts$adj.P.Val>0.05, "n.s.", ifelse(all_DE_results_ts$logFC>0,ifelse(all_DE_results_ts$logFC>1,"Up","Up_weak"), ifelse(all_DE_results_ts$logFC < -1,"Down", "Down_weak")))
+all_DE_results_ts$DE_class = ifelse(all_DE_results_ts$adj.P.Val>0.05, "n.s.", ifelse(all_DE_results_ts$logFC > 0,"Up","Down"))
+#agg_fun = function(x) paste(unique(x),collapse=";")
+agg_fun = function(x) ifelse("Down" %in% x, "Down",ifelse("Up" %in% x, "Up","n.s."))
+all_DE_results_sw = dcast(all_DE_results_ts, SYMBOL ~ condition, value.var="DE_class", fun.aggregate=agg_fun)
+```
+
+```{r, echo=FALSE}
+all_output_txt_files = list()
+all_output_excel_files = list()
+output_file_prefix = paste(result_folder,"Differential_expression_results_", sep="/")
+selected_cols = c("Row.names", "SYMBOL", "GENENAME", "logFC","AveExpr","t","P.Value","adj.P.Val" )
+for (tc in all_target_conditions) {
+  filename = paste(output_file_prefix, tc, ".txt", sep="" )
+  write.table(all_results[[tc]][,selected_cols], file= filename, row.names=F , sep="\t", dec=".")
+  all_output_txt_files[[paste("DGE",tc)]] = filename
+}
+
+short_names = list()
+for (i in sort(names(all_results))) {
+  ii = i
+  short_names[[i]] = ii
+}
+
+filename = paste(result_folder,"DE_results_comparison.txt",sep="/")
+write.table(all_DE_results_sw, file = filename,sep="\t",quote=F, row.names=F)
+all_output_txt_files[["DGE comparison"]] = filename
+
+output_file_prefix = paste(result_folder,"Differential_expression_results_TS", sep="/")
+selected_cols = c("Row.names", "SYMBOL", "GENENAME", "logFC","AveExpr","t","P.Value","adj.P.Val" )
+
+# Write TS table for DGE
+tmp = list()
+for (tc in all_target_conditions) {
+  r = all_results[[tc]][,selected_cols]
+  r$Comparison = tc
+  tmp[[tc]] = r
+  
+}
+tmp2 = do.call(rbind, tmp)
+write.table(tmp2, file=paste(output_file_prefix, ".txt", sep="" ), row.names=F , sep="\t", dec=".")
+
+
+tmp = as.data.frame(data_mat)
+tmp$GeneSymbol = anno_unique[rownames(tmp),"SYMBOL"]
+tmp$GeneDescription = anno_unique[rownames(tmp),"GENENAME"]
+filename = paste(result_folder,"Normalized_expression_data.txt",sep="/")
+write.table(tmp, file=filename,sep="\t",col.names=NA)
+
+all_output_txt_files[["Normalized expression values"]] = filename
+```
+
+The following files have been written:
+```{r, echo=FALSE}
+output_file = paste(result_folder,"DGE_analysis_image.Rdata", sep="/")
+save(all_results, all_fits, all_designs, data_mat, airway_samples, intestinal_ft_samples, ed, signif_genes_list, file=output_file)
+
+all_txt_files = as.data.frame(t(as.data.frame(all_output_txt_files)))
+colnames(all_txt_files)[1] = "File name"
+all_txt_files$Format = "Tab separated text"
+
+all_txt_files
+
+```
+

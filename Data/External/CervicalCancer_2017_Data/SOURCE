@@ -1,0 +1,6 @@
+https://gdc.cancer.gov/about-data/publications/cesc_2017
+
+RNASeq: Download unc.edu_CESC.IlluminaHiSeq_RNASeqV2.Level_3.1.11.0.tar.gz (Level 3 Data Archives)
+then execute extract_gene_expression_matrix_counts.R script 
+
+

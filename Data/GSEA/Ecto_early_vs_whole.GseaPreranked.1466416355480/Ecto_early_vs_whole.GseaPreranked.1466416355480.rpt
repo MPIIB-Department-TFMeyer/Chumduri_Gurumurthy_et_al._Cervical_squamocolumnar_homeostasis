@@ -1,0 +1,22 @@
+producer_class	xtools.gsea.GseaPreranked
+producer_timestamp	1466416355480
+param	collapse	false
+param	plot_top_x	20
+param	rnk	/data_genome2/projects/MB194_Cervical_organoids/Human/Results/2016-06-17/ecto_early_vs_whole_unpaired_ranked_for_GSEA.rnk
+param	norm	meandiv
+param	scoring_scheme	weighted
+param	make_sets	true
+param	mode	Max_probe
+param	gmx	/data_genome1/References/GeneSets/c3.all.v5.1.symbols.gmt
+param	gui	false
+param	rpt_label	Ecto_early_vs_whole
+param	help	false
+param	out	/home/hilmar/gsea_home/output/jun20
+param	include_only_symbols	true
+param	set_min	15
+param	nperm	1000
+param	rnd_seed	timestamp
+param	zip_report	false
+param	set_max	500
+
+file	/home/hilmar/gsea_home/output/jun20/Ecto_early_vs_whole.GseaPreranked.1466416355480/index.html

@@ -1,0 +1,575 @@
+---
+title: "MB194 mouse cervix organoids"
+output: html_document
+---
+
+```{r, echo=FALSE, results='hide', messages=FALSE}
+rm(list=ls())
+source("/data_genome1/SharedSoftware/inhouse_development/R/FunctionalEnrichmentHelpers.R")
+setwd("/data_genome2/projects/MB194_Cervical_organoids/Mouse/")
+library(limma)
+suppressMessages(library(xlsx))
+library(reshape2)
+library(pheatmap)
+suppressMessages(library(GSA))
+library(xtable)
+suppressMessages(library(gplots))
+library(impute)
+load("./Results/data_archive/2016-06-17_ecto_endo_paper/MB194_mouse_micro_array_preprocessed_data.Rdata")
+
+result_folder = paste("./Results",format(Sys.time(), "%Y-%m-%d"),sep="/")
+if (!file.exists(result_folder)) dir.create(result_folder, recursive=T)
+
+```
+
+# Data overview
+
+```{r, PCA, echo=FALSE, fig.width=8, fig.height=8, eval=FALSE}
+## Primary Component Analysis on normalized data after adjusting for patient effect
+norm_exp = normalized$E
+NA_rows = apply(norm_exp,1,function(x) sum(is.na(x)))
+pca = prcomp(t(norm_exp[NA_rows==0,]))
+#pca = prcomp(t(normalized$E), na.action=na.omit)
+plot(pca$x[,1],pca$x[,2],type="n", xlab="1st primary component",ylab="2nd primary component", main="PCA on normalized expression data")
+cp = palette(rainbow(8))
+text(pca$x[,1],pca$x[,2],labels=paste(ed[colnames(normalized$E),]$ShortName,ed[colnames(normalized$E),]$patient_or_mouse_id, sep="_"), col=cp[as.numeric(as.factor(ed[colnames(normalized$E),]$Organoid.Type))])
+```
+
+## MDS on normalized data
+
+```{r, MDS, echo=FALSE, fig.width=8, fig.height=8}
+cp = palette(rainbow(8))
+data_inp = t(normalized$E) 
+
+d <- dist(data_inp) # euclidean distances between the rows
+fit <- cmdscale(d,eig=TRUE, k=2) # k is the number of dim
+
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2", main="Metric MDS, all samples, normalized", type="n")
+text(x,y,labels=paste(ed[colnames(normalized$E),]$ShortName,ed[colnames(normalized$E),]$patient_or_mouse_id, sep="_"), col=cp[as.numeric(factor(ed[rownames(data_inp),]$Organoid.Type))])
+```
+
+
+
+## Expression analysis outline
+
+Micro array expression data from MB030 (Hpy infection in primary cell culture) was preprocessed as described in a separate document. 
+
+Expression data will be analysed in the following way:
+
+* For each of the selected comparisons we compare the replicates of the target condition to the correspondig control using LIMMA, producing differential expression statistics for all genes and comparisons. 
+* Analysis is perfomed a) in a multivariate model containing treatment + infection + the interaction of treatment and infection and b) as separate two group comparisons within the comparisons of each factor. 
+
+All result tables are available as separate Excel files. 
+
+
+## Differential expression overview
+
+```{r, dge_analysis, echo=FALSE, results='hide'}
+# remove duplicate and control probes before DE
+
+# FIXME: Check if we can average dupliated probes
+
+dups = duplicated.default(normalized$genes$ProbeName)
+controls = normalized$genes$ControlType!=0
+normalized_unfiltered = normalized
+normalized = normalized[!(dups | controls),]
+
+rsd = apply(normalized$E,1,sd,na.rm=T)
+rmean = apply(normalized$E,1,mean,na.rm=T)
+cofvar = rsd/rmean
+low_var_flag =  cofvar < quantile(cofvar,na.rm=T, p=c(0.5))
+
+all_results = list()
+
+
+# Commented ones are for testing only- results are way better doing paired analysis
+#############################################
+# Early vs. Whole organoid
+#############################################
+# sel_samples = rownames(subset(ed, scan_id %in% c("M1","M2","M7","M8", "M9","M10","M11", "M12") ))
+# edata = normalized[,sel_samples]
+# treat = factor(ed[sel_samples,]$Organoid.Type, levels=c("Whole Organoid","EarlyOrganoids"))
+# #infection = factor(ed[sel_samples,]$Infection, levels=c("NI","Ctr"))
+# ff = formula(~ treat)
+# 
+# design = model.matrix(ff,  contrasts.arg=list(treat=contr.treatment))
+# 
+# fit <- lmFit(edata,design)
+# fit <- eBayes(fit)
+# res = topTable(fit, coef="treat2", adjust="BH", number=nrow(edata))
+# all_results[["Early_vs_Whole_all_unpaired"]] = res
+
+#########################################################################
+
+# array = factor(ed[sel_samples,]$array_ID)
+# ff = formula(~ array + treat)
+# 
+# design = model.matrix(ff,  contrasts.arg=list(treat=contr.treatment))
+# 
+# fit <- lmFit(edata,design)
+# fit <- eBayes(fit)
+# res = topTable(fit, coef="treat2", adjust="BH", number=nrow(edata))
+# all_results[["Early_vs_Whole_all_array_adj"]] = res
+
+#########################################################################
+
+sel_samples = rownames(subset(ed, scan_id %in% c("M1","M2","M7","M8") ))
+#edata = normalized[!low_var_flag,sel_samples]
+edata = normalized[,sel_samples]
+ed_filtered = ed[sel_samples,]
+treat = factor(ed_filtered[sel_samples,]$Organoid.Type, levels=c("Whole Organoid","EarlyOrganoids"))
+ExpID = factor(ed_filtered$patient_or_mouse_id)
+ff = formula(~ ExpID + treat)
+ 
+design = model.matrix(ff,  contrasts.arg=list(treat=contr.treatment, ExpID=contr.treatment))
+
+fit <- lmFit(edata,design)
+fit <- eBayes(fit)
+res = topTable(fit, coef="treat2", adjust="BH", number=nrow(edata))
+
+all_results[["early_vs_whole_M1.7_paired"]] = res
+
+#########################################################################
+
+sel_samples = rownames(subset(ed, scan_id %in% c("M9","M10","M11","M12") ))
+#edata = normalized[!low_var_flag,sel_samples]
+edata = normalized[,sel_samples]
+ed_filtered = ed[sel_samples,]
+treat = factor(ed_filtered[sel_samples,]$Organoid.Type, levels=c("Whole Organoid","EarlyOrganoids"))
+ExpID = factor(ed_filtered$patient_or_mouse_id)
+ff = formula(~ ExpID + treat)
+ 
+design = model.matrix(ff,  contrasts.arg=list(treat=contr.treatment, ExpID=contr.treatment))
+
+fit <- lmFit(edata,design)
+fit <- eBayes(fit)
+res = topTable(fit, coef="treat2", adjust="BH", number=nrow(edata))
+
+all_results[["early_vs_whole_M16_paired"]] = res
+
+#########################################################################
+
+# sel_samples = rownames(subset(ed, scan_id %in% c("M1","M2","M7","M8", "M9","M10","M11", "M12") ))
+# edata = normalized[,sel_samples]
+# ed_filtered = ed[sel_samples,]
+# treat = factor(ed_filtered[sel_samples,]$Organoid.Type, levels=c("Whole Organoid","EarlyOrganoids"))
+# ExpID = factor(ed_filtered$patient_or_mouse_id)
+# array = factor(ed[sel_samples,]$array_ID)
+# ff = formula(~ ExpID + treat)
+#  
+# design = model.matrix(ff,  contrasts.arg=list(treat=contr.treatment, ExpID=contr.treatment))
+# 
+# fit <- lmFit(edata,design)
+# fit <- eBayes(fit)
+# res = topTable(fit, coef="treat2", adjust="BH", number=nrow(edata))
+# 
+# all_results[["early_vs_whole_all_paired"]] = res
+
+
+###############################################################################################
+# LIMMA user guide 9.5.2
+ed$infection_exp = ifelse(is.na(ed$Time.post.infection),"normal","inf_experiment")
+
+TS = factor(make.names(paste(ed$Organoid.Type, ed$Media, ed$infection_exp, ed$Infection, ed$Time.post.infection,sep="_")))
+edata = normalized
+design = model.matrix(~ 0 + TS)
+colnames(design) = levels(TS)
+fit <- lmFit(edata, design)
+
+cont.matrix <- makeContrasts( CD49_vs_whole_organoid_M1.7 = CD49f..Cells_M1.7.no.p.s_normal_Uninfected_NA-Whole.Organoid_M1.7.no.p.s_normal_Uninfected_NA,
+                              CD49_vs_early = CD49f..Cells_M1.7.no.p.s_normal_Uninfected_NA-EarlyOrganoids_M1.7.no.p.s_normal_Uninfected_NA,
+                              levels=design )
+fit2 <- contrasts.fit(fit, cont.matrix)
+fit2 <- eBayes(fit2)
+
+
+for (c in colnames(cont.matrix)) {
+  res = topTable(fit2, coef=c, adjust="BH", number=nrow(edata))
+  all_results[[c]] = res
+}
+
+```
+
+
+### Volcano plots
+
+For each comparison, the distribution of the fold change (on a log2 scale) and adjusted p-value (on reverse logarithmical scale) is shown in a volcano plot. The red line denotes the FDR cutoff of 0.05. 
+
+```{r, DE_volcano, echo=FALSE, results="hide", fig.width=16,fig.height = 10 }
+all_target_conditions = names(all_results)
+par(mfrow=c(2,3))
+
+for (tc in all_target_conditions) {
+  r = all_results[[tc]]
+  plot(r$logFC, -log10(r$adj.P.Val),xlab="log2 Fold Change",ylab="-log10(adj. p-val)", ylim=c(0,max(2,max(-log10(r$adj.P.Val),na.rm=T))))
+  title(main=tc, sub=paste("(",nrow(subset(r, adj.P.Val < 0.05))," signif. DE genes)",sep="") )
+  abline(h=-log10(0.05),col="red")
+}
+```
+
+
+```{r, coef_var, echo=FALSE, results="hide", fig.width=6,fig.height = 6 , eval=FALSE}
+cc = paste(ed$Infection,"_",ed$Treatment, sep="")
+mean=apply(normalized$E, 1, function(x) tapply(x, cc, mean, na.rm=T))
+sd = apply(normalized$E, 1, function(x) tapply(x, cc, sd, na.rm=T))
+coefv = sd/mean
+boxplot(t(coefv),outline = F,las=2,ylab="Coefficient of variation", main="Coefficient of variation within groups acrossp probes")
+```
+
+
+### Overlaps between significantly expressed gene lists
+
+The following table describes the overlap (intersection) of the list of differentially expressed genes between any two comparisons of a target condition to control.  
+The Jaccard coefficient defines the ratio of the overlap size to the size of the union of both lists. 
+
+```{r, overlaps, echo=FALSE, results="hide"}
+# OVERLAPS between clones
+
+#library(VennDiagram)
+#v1 = venn.diagram(signif_genes_list, filename="./venn.tiff" )
+
+signif_genes_list = lapply(all_results, function(x) {subset(x,adj.P.Val<0.05)$GeneSymbol})
+combinations = combn(names(signif_genes_list),2)
+pairwise_intersections = apply(combinations,2, function(x) { intersect(signif_genes_list[[x[1]]], signif_genes_list[[x[2]]])} )
+d = as.data.frame(t(combinations))
+d$overlap = lapply(pairwise_intersections, length)
+comp_names = names(signif_genes_list)
+d_mat = matrix(NA, nrow=length(comp_names), ncol=length(comp_names))
+colnames(d_mat) = comp_names
+rownames(d_mat) = comp_names
+tmp = apply(d, 1, function(x) {x = as.vector(unlist(x)); d_mat[ x[1],x[2] ] <<- as.numeric(x[3]); d_mat[ x[2],x[1] ] <<- as.numeric(x[3]) })
+rm(tmp)
+ll = unlist(lapply(signif_genes_list, length))
+for (n in names(ll)) d_mat[n, n] <- ll[n]
+
+totals_m = matrix(rep(ll, times=nrow(d_mat)), nrow(d_mat), ncol(d_mat))
+d_mat_prop = d_mat/totals_m
+
+d$pairwise_union_lengths = apply(combinations,2, function(x) { length(union(signif_genes_list[[x[1]]], signif_genes_list[[x[2]]]))} )
+d$jaccard_coef = as.numeric(d$overlap)/d$pairwise_union_lengths
+```
+
+```{r, DE_overlap_tab, echo=FALSE, results="asis"}
+d_t = d[,c(1,2,3,5)]
+colnames(d_t) = c("Condition_1", "Condition_2", "Overlap of DE genes", "Jaccard coefficient")
+print.xtable(xtable(d_t,display=c("s","s","s","d","g"), align="|l|l|l|l|l|"), type="html", file="" , include.rownames=F)
+```
+
+
+The heatmap below shows the overlap (intersection) of the list of differentially expressed genes between any two comparisons of a target condition to control. The diagonal shows the size of the individual list of differentially expressed genes for a comparison. Values are depicted on a log10 scale (i.e. 2 = overlap of 100 genes and so on).
+
+```{r, DE_overlap_heatmap, echo=FALSE, results="hide"}
+#pheatmap(log10(d_mat))
+pheatmap(log10(d_mat+1))
+#pheatmap(d_mat_prop)
+```
+
+
+
+```{r,  echo=FALSE, fig.width=8, fig.height=8, message=FALSE, warning=FALSE, results='hide', eval=FALSE}
+## CAMERA
+
+#msig_db_file = "/home/hilmar/Documents/Data/GeneSets/c2.cp_and_c5.bp.v4.0.symbols.gmt"
+msig_db_file = "/data_genome1/References/GeneSets/h_c2_c3_c5bp_c6.v5.0.symbols.gmt"
+msig_db = GSA.read.gmt(msig_db_file)
+
+homologous_genes = read.table("/data/References/HomologousGenes/HomoloGene/build68/homologene_9606_10090.txt",sep="\t", header=T, as.is=T)
+translated_symbols = merge(normalized$genes, homologous_genes, by.x="GeneSymbol", by.y="symbol_2", all.x=T, sort=F)
+
+geneset_indices= ids2indices(msig_db$genesets, translated_symbols$symbol_1)
+n_imputed = impute.knn(normalized$E)$data
+
+# same design and contrast matrix as above for DGE
+edata = normalized
+design = model.matrix(~ 0 + TS)
+colnames(design) = levels(TS)
+fit <- lmFit(edata, design)
+
+CAMERA_result_file = "CAMERA_results.Rdata"
+rerun_CAMERA = T
+if (rerun_CAMERA) {
+all_camera_results = list()
+  for(tc in names(all_results)) {
+    if (! tc %in% colnames(cont.matrix)) next # ignore the two single-patient tests that do not work with this design
+    
+    dd = design #all_designs[[tc]]
+    cc = function(x) camera(n_imputed, x, design=design, contrast = cont.matrix[,tc])
+    res_camera = lapply(geneset_indices,cc)
+    r1 = do.call(rbind, res_camera)
+    r1$geneset_name = msig_db$geneset.names
+    #r1_sig = subset(r1, PValue < 0.01)
+    all_camera_results[[tc]] = r1
+  }  
+
+  # paired analysis needs other settings
+  sel_samples = rownames(subset(ed, scan_id %in% c("M1","M2","M7","M8") ))
+  #edata = normalized[!low_var_flag,sel_samples]
+  edata = n_imputed[,sel_samples]
+  ed_filtered = ed[sel_samples,]
+  treat = factor(ed_filtered[sel_samples,]$Organoid.Type, levels=c("Whole Organoid","EarlyOrganoids"))
+  ExpID = factor(ed_filtered$patient_or_mouse_id)
+  ff = formula(~ ExpID + treat)
+   
+  design = model.matrix(ff,  contrasts.arg=list(treat=contr.treatment, ExpID=contr.treatment))
+  
+  cc = function(x) camera(edata, x, design=design, contrast = "treat2")
+  res_camera = lapply(geneset_indices,cc)
+  r1 = do.call(rbind, res_camera)
+  r1$geneset_name = msig_db$geneset.names
+  #r1_sig = subset(r1, PValue < 0.01)
+  all_camera_results[["early_vs_whole_organoid_paired"]] = r1
+  
+  camera_result_date = Sys.Date()
+  save(all_camera_results, camera_result_date, file=CAMERA_result_file)
+} else {
+  load(CAMERA_result_file)
+}
+
+for (n in names(all_camera_results)) {
+  tmp = all_camera_results[[n]]
+  tmp$comparison = n
+  all_camera_results[[n]] = tmp
+}
+camera_enrichment_msig_db_MB194 = do.call(rbind, all_camera_results)
+min_p = tapply(camera_enrichment_msig_db_MB194$PValue, camera_enrichment_msig_db_MB194$geneset_name, min, na.rm=T)
+min_p_sig = names(min_p[min_p<0.05])
+col_order = c("comparison","geneset_name","Direction","PValue","NGenes")
+write.table(camera_enrichment_msig_db_MB194[camera_enrichment_msig_db_MB194$geneset %in% min_p_sig,col_order], file=paste(result_folder,"Enrichment_MsigDB_geneSets.txt", sep="/"), row.names=F , sep="\t", dec=".")
+```
+
+# Gene Ontology Enrichment
+
+```{r, GO_analysis, echo=FALSE, results="hide"}
+GO_result_file = "GO_results_all_conditions.Rdata"
+rerun_GO_analysis=T
+if(rerun_GO_analysis) {
+  all_GO_results = list()
+  for (tc in all_target_conditions) {
+    gg = GO_analysis(all_results[[tc]], fc_cut=1, p_cut=0.1, p_col="adj.P.Val", logFC_col = "logFC", gene_symbol_col="GeneSymbol", org_db="org.Mm.eg.db")
+    all_GO_results[[tc]] = gg
+  }
+  dd = Sys.Date()
+  save(all_GO_results, dd, file=GO_result_file)
+} else {
+  load(GO_result_file)
+}
+```
+
+
+```{r, DE_combined, echo=FALSE, results="hide"}
+###############################################################################################################
+# Write Result Files
+###############################################################################################################
+
+all_DE_results_tmp = list()
+for (tc in all_target_conditions) {
+  tmp = all_results[[tc]]
+  tmp$condition = tc
+  all_DE_results_tmp[[tc]] = tmp
+}
+all_DE_results_ts = do.call(rbind, all_DE_results_tmp)
+#all_DE_results_ts$DE_class = ifelse(all_DE_results_ts$adj.P.Val>0.05, "n.s.", ifelse(all_DE_results_ts$logFC>0,ifelse(all_DE_results_ts$logFC>1,"Up","Up_weak"), ifelse(all_DE_results_ts$logFC < -1,"Down", "Down_weak")))
+all_DE_results_ts$DE_class = ifelse(all_DE_results_ts$adj.P.Val>0.05, "n.s.", ifelse(all_DE_results_ts$logFC > 0,"Up","Down"))
+#agg_fun = function(x) paste(unique(x),collapse=";")
+agg_fun = function(x) ifelse("Down" %in% x, "Down",ifelse("Up" %in% x, "Up","n.s."))
+all_DE_results_sw = dcast(all_DE_results_ts, GeneSymbol ~ condition, value.var="DE_class", fun.aggregate=agg_fun)
+```
+
+```{r, echo=FALSE}
+all_output_txt_files = list()
+all_output_excel_files = list()
+output_file_prefix = paste(result_folder,"Differential_expression_results_", sep="/")
+selected_cols = c("ProbeName", "GeneSymbol", "SystematicName", "GeneDescription","logFC","AveExpr","t","P.Value","adj.P.Val" )
+for (tc in all_target_conditions) {
+  filename = paste(output_file_prefix, tc, ".txt", sep="" )
+  write.table(all_results[[tc]][,selected_cols], file= filename, row.names=F , sep="\t", dec=".")
+  all_output_txt_files[[paste("DGE",tc)]] = filename
+}
+
+short_names = list()
+for (i in names(all_results)) {
+  ii = gsub(" ","_", gsub(",","_",i))
+  short_names[[i]] = ii
+}
+
+DGE_Excel_filename = paste(result_folder,"DiffExpression_2016-01-27",sep="/")
+txt2xlsx_command = paste("python /data_genome1/SharedSoftware/inhouse_development/tools/txt2xlsx.py -o",DGE_Excel_filename," -L", paste(unlist(short_names),collapse=","),  paste(paste('"', output_file_prefix, names(short_names), '.txt"', sep="" ), collapse=" "), sep=" ")
+system(txt2xlsx_command)
+all_output_excel_files[["DGE results"]] = DGE_Excel_filename
+
+
+filename = paste(result_folder,"DE_results_comparison.txt",sep="/")
+write.table(all_DE_results_sw, file = filename,sep="\t",quote=F, row.names=F)
+all_output_txt_files[["DGE comparison"]] = filename
+
+output_file_prefix = paste(result_folder,"Differential_expression_results_TS", sep="/")
+selected_cols = c("ProbeName", "GeneSymbol","GeneDescription","logFC","AveExpr","t","P.Value","adj.P.Val" )
+
+# Write TS table for DGE
+tmp = list()
+for (tc in all_target_conditions) {
+  r = all_results[[tc]][,selected_cols]
+  r$Comparison = tc
+  tmp[[tc]] = r
+  
+}
+tmp2 = do.call(rbind, tmp)
+write.table(tmp2, file=paste(output_file_prefix, ".txt", sep="" ), row.names=F , sep="\t", dec=".")
+
+
+tmp = as.data.frame(normalized$E)
+colnames(tmp) = ed[colnames(normalized$E),]$sample_ID
+rownames(tmp) = normalized$genes$ProbeName
+tmp$GeneSymbol = normalized$genes$GeneSymbol
+tmp$GeneDescription = normalized$genes$GeneDescription
+filename = paste(result_folder,"Normalized_expression_data.txt",sep="/")
+write.table(tmp, file=filename,sep="\t",col.names=NA)
+
+all_output_txt_files[["Normalized expression values"]] = filename
+
+#write.table(normalized$genes, file="ArrayDesign_60k_custom.txt",sep="\t",row.names=F)
+
+#############################################################################################
+# write GO results to file
+#############################################################################################
+
+output_file_prefix = paste(result_folder,"GO_results_", sep="/")
+
+all_sign_GO_IDs = list()
+all_GO_IDs = list()
+
+for (tc in all_target_conditions) {
+  r_up = all_GO_results[[tc]][["up"]]
+  r_down = all_GO_results[[tc]][["down"]]
+  r_up$adj.P.classicFisher = p.adjust(r_up$classicFisher, "BH")
+  r_down$adj.P.classicFisher = p.adjust(r_down$classicFisher, "BH")
+  r = rbind(r_up, r_down)
+  r$de_list = c(rep("Up",nrow(r_up)), rep("Down",nrow(r_down)))
+  r_filtered = subset(r, adj.P.classicFisher < .25)
+  #all_sign_GO_IDs[[tc]] = r_filtered$GO.ID
+  all_GO_IDs[[tc]] = r$GO.ID
+  write.table(r_filtered, file=paste(output_file_prefix, tc, ".txt", sep="" ), row.names=F , sep="\t", dec=".", quote=F)
+}
+
+GO_Excel_filename = paste(result_folder,"GO_enrichment",sep="/")
+txt2xlsx_command = paste("python /data_genome1/SharedSoftware/inhouse_development/tools/txt2xlsx.py -o",GO_Excel_filename," -L", paste(unlist(short_names),collapse=","),  paste(paste('"', output_file_prefix, names(short_names), '.txt"', sep="" ), collapse=" "), sep=" ")
+system(txt2xlsx_command)
+
+rm("c")
+#all_unique_GO_IDs = unique(do.call(c, all_sign_GO_IDs))
+all_unique_GO_IDs = unique(do.call(c, all_GO_IDs))
+go2s = get_GO2SYMBOL(all_unique_GO_IDs, org_db="org.Mm.eg.db")
+
+write.table(go2s, file=paste(result_folder,"GO2SYMBOL.txt",sep="/"),sep="\t",quote=F, row.names=F)
+
+output_file_prefix = paste(result_folder,"GO_results_TS", sep="/")
+
+# Write TS table for GO
+tmp = list()
+for (tc in all_target_conditions) {
+  for (g in c("up","down")) {
+    r = all_GO_results[[tc]][[g]]
+    r$Comparison = tc
+    r$Group = g
+    tmp[[paste(tc,"_",g)]] = r  
+  }
+}
+tmp2 = do.call(rbind, tmp)
+write.table(tmp2, file=paste(output_file_prefix, ".txt", sep="" ), row.names=F , sep="\t", dec=".")
+
+######################################################################################################
+## Produce a list of outer membrane proteins in the data set. 
+library(org.Mm.eg.db)
+library(GO.db)
+GO_anno=select(org.Mm.eg.db, keys=normalized$genes$EntrezID, columns=c("GOALL"),keytype="ENTREZID")
+GO_CC = subset(GO_anno, ONTOLOGYALL=="CC")
+
+#GO_terms = select(GO.db, keys=unique(GO_anno$GO), columns=c("TERM","ONTOLOGY" ), keytype="GOID")
+#membrane = subset(GO_terms, ONTOLOGY=="CC" & grepl("membrane", TERM))
+#write.table(membrane, file=paste(result_folder,"membrane_terms.raw.txt",sep="/"), sep="\t")
+
+curated_membrane_terms = read.table("/data_genome2/References/GeneSets/membrane_terms.curated.txt", sep="\t", header=T)
+
+outer_membrane_terms = as.character(subset(curated_membrane_terms, Selection==1)$GOID)
+non_outer_terms = as.character(subset(curated_membrane_terms, Selection==0)$GOID)
+
+#is_membrane_protein = function(x) { any(x %in% outer_membrane_terms) && !any(x %in% non_outer_terms)}
+is_membrane_protein = function(x) { any(x %in% outer_membrane_terms)}
+membrane_prot_flags = tapply(GO_CC$GOALL, GO_CC$ENTREZID, is_membrane_protein)
+membrane_prot_genes = names(membrane_prot_flags[membrane_prot_flags])
+
+# Now generate a table of GO CC annotations for membrane proteins
+GO_anno_sel=select(org.Mm.eg.db, keys=membrane_prot_genes, columns=c("GO", "SYMBOL"),keytype="ENTREZID")
+GO_CC_sel = subset(GO_anno_sel, ONTOLOGY=="CC")
+GO_terms_sel = select(GO.db, keys=unique(GO_CC_sel$GO), columns=c("TERM","ONTOLOGY" ), keytype="GOID")
+GO_CC_annotated = merge(GO_CC_sel, GO_terms_sel, by.x="GO", by.y="GOID", all.x=T, sort=F)
+GO_CC_annotated$GO_full = paste(GO_CC_annotated$GO, GO_CC_annotated$TERM, sep=" ")
+
+merge_go <- function(x) paste(x, collapse=", ")
+
+xx = dcast(GO_CC_annotated, SYMBOL ~ ., value.var = "GO_full", fun.aggregate = merge_go)
+colnames(xx)[2] = "GO_terms"
+output_file_prefix = paste(result_folder,"Membrane_proteins_mouse", sep="/")
+write.table(xx, file=paste(output_file_prefix, ".txt", sep=""), sep="\t", row.names=F, quote=F )
+
+
+######################################################################################################
+## Produce a list of development associated proteins in the data set. 
+library(org.Mm.eg.db)
+library(GO.db)
+GO_anno=select(org.Mm.eg.db, keys=normalized$genes$EntrezID, columns=c("GOALL"),keytype="ENTREZID")
+GO_BP = subset(GO_anno, ONTOLOGYALL=="BP")
+
+GO_terms = select(GO.db, keys=unique(GO_anno$GO), columns=c("TERM","ONTOLOGY" ), keytype="GOID")
+dev_terms = subset(GO_terms, ONTOLOGY=="BP" & grepl("development", TERM))$GOID
+#write.table(membrane, file=paste(result_folder,"membrane_terms.raw.txt",sep="/"), sep="\t")
+
+#is_membrane_protein = function(x) { any(x %in% outer_membrane_terms) && !any(x %in% non_outer_terms)}
+is_dev_protein = function(x) { any(x %in% dev_terms)}
+dev_prot_flags = tapply(GO_BP$GOALL, GO_BP$ENTREZID, is_dev_protein)
+dev_prot_genes = names(dev_prot_flags[dev_prot_flags])
+
+# Now generate a table of GO CC annotations for membrane proteins
+GO_anno_sel=select(org.Mm.eg.db, keys=dev_prot_genes, columns=c("GO", "SYMBOL"),keytype="ENTREZID")
+GO_BP_sel = subset(GO_anno_sel, ONTOLOGY=="BP")
+GO_terms_sel = select(GO.db, keys=unique(GO_BP_sel$GO), columns=c("TERM","ONTOLOGY" ), keytype="GOID")
+GO_BP_annotated = merge(GO_BP_sel, GO_terms_sel, by.x="GO", by.y="GOID", all.x=T, sort=F)
+GO_BP_annotated$GO_full = paste(GO_BP_annotated$GO, GO_BP_annotated$TERM, sep=" ")
+
+merge_go <- function(x) paste(x, collapse=", ")
+
+xx = dcast(GO_BP_annotated, SYMBOL ~ ., value.var = "GO_full", fun.aggregate = merge_go)
+colnames(xx)[2] = "GO_terms"
+output_file_prefix = paste(result_folder,"Development_proteins_mouse", sep="/")
+write.table(xx, file=paste(output_file_prefix, ".txt", sep=""), sep="\t", row.names=F, quote=F )
+
+```
+
+```{r GEO_expression_tab, echo=FALSE}
+geo_expression_tab = data.frame("ID REF"=1:nrow(normalized_unfiltered$E), "Name" = normalized_unfiltered$genes$ProbeName, stringsAsFactors = F)
+nmat = normalized_unfiltered$E
+colnames(nmat) = ed[colnames(nmat), "sample_ID"]
+geo_expression_tab = cbind(geo_expression_tab, nmat)
+write.table(geo_expression_tab, file="./GEO_submission/Ecto-Endo-Manuscript/Normalized_expression_all_probes.txt", sep="\t", row.names=F, quote=F, na="")
+```
+
+
+The following files have been written:
+```{r, echo=FALSE}
+
+all_txt_files = as.data.frame(t(as.data.frame(all_output_txt_files)))
+colnames(all_txt_files)[1] = "File name"
+all_txt_files$Format = "Tab separated text"
+
+all_excel_files = as.data.frame(t(as.data.frame(all_output_excel_files)))
+colnames(all_excel_files)[1] = "File name"
+all_excel_files$Format = "Excel"
+
+all_txt_files
+all_excel_files
+
+```
+

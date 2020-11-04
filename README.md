@@ -12,40 +12,7 @@ To reproduce the analysis you will need some or all of the following software:
 
   - R (>= v3.4.0) [cran.r-project.org]
 
-The following R packages should be installed from either CRAN or Bioconductor:
-
-  - BiocParallel
-  - Biostrings
-  - BSgenome.Hsapiens.UCSC.hg19
-  - BSgenome.Hsapiens.UCSC.hg38
-  - data.table
-  - deconstructSigs
-  - directlabels
-  - DNAshapeR
-  - dplyr
-  - GenomicFeatures
-  - GenomicRanges
-  - ggplot2
-  - ggpubr
-  - ggseqlogo
-  - ggthemes
-  - grid
-  - gridExtra
-  - Hmisc
-  - knitr
-  - naturalsort
-  - pheatmap
-  - randomForest
-  - readxl
-  - reshape2
-  - rgl
-  - rmarkdown
-  - robust
-  - robustbase
-  - scales
-  - seqRFLP
-  - stringr
-  - VariantAnnotation
+See the HTML files in the Code/.. subfolders for information which packages should be installed from either CRAN or Bioconductor.
 
 ## External data
 

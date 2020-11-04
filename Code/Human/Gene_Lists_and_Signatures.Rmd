@@ -1,0 +1,350 @@
+---
+title: "Human cervix organoids - Gene List Definitions and Comparisons"
+output: 
+ html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: false
+    number_sections: true
+    code_folding: hide
+    
+pdf_document:
+    fig_caption: true
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Hilmar Berger"
+---
+
+
+```{r init, message=FALSE}
+rm(list=ls())
+source("Helper_functions.R")
+library(limma)
+library(reshape2)
+library(pheatmap)
+library(GSA)
+library(xtable)
+library(gplots)
+library(impute)
+library(RColorBrewer)
+library(naturalsort)
+library(ggplot2)
+library(data.table)
+library(GenomicRanges)
+library(VennDiagram)
+flog.threshold(ERROR) # to stop VennDiagram writing a log file for each plot
+#library("rrcov")
+
+library(org.Hs.eg.db)
+
+result_folder = "../../Results/Human"
+if (!file.exists(result_folder)) dir.create(result_folder, recursive=T)
+
+# This folder will be used to store results in RData format
+Rdata_folder = "../../Results/Human"
+
+```
+
+# Overview over data used in this analysis
+
+```{r datasets, message=FALSE}
+load("../../Results/Human/DGE_analysis_image.Rdata")
+
+# image will overwrite result folder settings, so reset here to current date
+result_folder = "../../Results/Human"
+
+ground_state_env <- new.env(parent = baseenv())
+load("../../Data/External/GroundState/analysis/Results/DGE_analysis_image.Rdata", envir=ground_state_env)
+
+proliferation_associated_genes = read.table("../../Data/External/Proliferation_associated_genes/Proliferation_associated_genes_Schwede_et_al_2013.txt", sep="\t", header=T, as.is=T)
+
+load("../../Data/External/Grant_CycleGenes/Grant_2013_cycle_genes.Rdata")
+
+library(GSA)
+msig_genesets = suppressWarnings(GSA.read.gmt("../../Data/External/GeneSets/REACTOME_CELL_CYCLE_MSigDB_v5.gmt"))
+gene_set_name = "REACTOME_CELL_CYCLE"
+reactome_cell_cycle_genes = msig_genesets$genesets[[which(msig_genesets$geneset.names == gene_set_name)]]
+
+GSEA_result_folder = "../../Data/GSEA/"
+GSEA_motif_results_SC_vs_diff = list()
+# GSEA pre-ranked results for Early vs. Whole and Ground state vs. Whole
+GSEA_motif_results_SC_vs_diff[["early_vs_whole_unpaired_up"]] = read.table(file.path(GSEA_result_folder, "Ecto_early_vs_whole.GseaPreranked.1466416355480/gsea_report_for_na_pos_1466416355480.txt"), sep="\t", header=T, as.is=T)
+GSEA_motif_results_SC_vs_diff[["early_vs_whole_unpaired_down"]] = read.table(file.path(GSEA_result_folder, "Ecto_early_vs_whole.GseaPreranked.1466416355480/gsea_report_for_na_neg_1466416355480.txt"), sep="\t", header=T, as.is=T)
+
+GSEA_motif_results_SC_vs_diff[["ground_state_vs_whole_all_up"]] = read.table(file.path(GSEA_result_folder, "Ecto_2D_vs_whole.GseaPreranked.1466416738870/gsea_report_for_na_pos_1466416738870.txt"), sep="\t", header=T, as.is=T)
+GSEA_motif_results_SC_vs_diff[["ground_state_vs_whole_all_down"]] = read.table(file.path(GSEA_result_folder, "Ecto_2D_vs_whole.GseaPreranked.1466416738870/gsea_report_for_na_neg_1466416738870.txt"), sep="\t", header=T, as.is=T)
+
+GSEA_motif_results_SC_vs_diff[["endo_2D_vs_whole_up"]] = read.table(file.path(GSEA_result_folder, "Endo_2D_vs_whole.GseaPreranked.1466417094934/gsea_report_for_na_pos_1466417094934.txt"), sep="\t", header=T, as.is=T)
+GSEA_motif_results_SC_vs_diff[["endo_2D_vs_whole_down"]] = read.table(file.path(GSEA_result_folder, "Endo_2D_vs_whole.GseaPreranked.1466417094934/gsea_report_for_na_neg_1466417094934.txt"), sep="\t", header=T, as.is=T)
+
+# Herfs et al Cervix epithelium microdissection GE results
+Herfs_folder = "../../Data/External/Herfs_et_al/"
+Herfs_st1 = read.table(paste(Herfs_folder, "Herfs_SuppTable1_junction_specific.txt",sep="/"), sep="\t", dec=",", header=T)
+Herfs_st2 = read.table(paste(Herfs_folder, "Herfs_SuppTable2_columnar_and_squamous_specific.txt", sep="/"), sep="\t", dec=",", header=T)
+
+Herfs_st1$description="Junction specific"
+Herfs_st2$description=c(rep("Columnar specific", 57), rep("Squamous specific",nrow(Herfs_st2)-57))
+Herfs_st_all = rbind(Herfs_st1, Herfs_st2)
+
+
+
+```
+
+```{r message=FALSE}
+ed$ShortName_unique = paste(ed$ShortName, ed$patient_or_mouse_id, ed$Passage, sep="_")
+ed_MB194_shortname = ed
+rownames(ed_MB194_shortname) = ed_MB194_shortname$ShortName_unique
+```
+
+# Gene lists defined in this analysis
+
+```{r gene_lists_init, message=FALSE}
+# structure of the gene list object
+# - Each gene signature/set/list is a named entry in all_gene_signatures
+# - Genes must not be duplicated
+# - Each entry is a data frame with the following columns
+#    - "GeneSymbol" - list of gene symbols (mandatory)
+#    - "EntrezID" - list of entrezID corresponding to GeneSymbol (mandatory)
+#    - "logFC" - list of corresponding log2 Fold changes (optional)
+#    - "P.Value" - list of corresponding P.Values (optional)
+#    - "Group" - list of corresponding groups (e.g. "up","down") (optional)
+#    - further optional columns
+
+all_gene_signatures = list()
+
+entrez_to_symbol = function(entrezids) {
+  tmp = as.character(entrezids)
+  tmp = tmp[!is.na(tmp)]
+  tmp_df= reshape2::dcast(select(org.Hs.eg.db, keys=tmp, keytype="ENTREZID", columns="SYMBOL"), ENTREZID ~ ., value.var="SYMBOL", fun.aggregate = function(x) paste(x[!is.na(x)], collapse=",") )
+  colnames(tmp_df) = c("EntrezID", "GeneSymbol")  
+  return(tmp_df)
+}
+
+symbol_to_entrez = function(symbols) {
+  tmp = as.character(symbols)
+  tmp = tmp[!is.na(tmp)]
+  tmp_df= reshape2::dcast(select(org.Hs.eg.db, keys=tmp, keytype="SYMBOL", columns="ENTREZID"), SYMBOL ~ ., value.var="ENTREZID", fun.aggregate = function(x) paste(x[!is.na(x)], collapse=",") )
+  colnames(tmp_df) = c("GeneSymbol", "EntrezID")  
+  return(tmp_df)
+}
+
+probename_to_symbol_agilent = function(probenames) {
+  tmp = normalized$genes[normalized$genes$ProbeName %in% probenames, c("ProbeName", "GeneSymbol")]
+  rownames(tmp) = tmp$ProbeName
+  return(tmp[probenames,])
+}
+
+probename_to_entrez_agilent = function(probenames) {
+  tmp = normalized$genes[normalized$genes$ProbeName %in% probenames, c("ProbeName", "EntrezID")]
+  rownames(tmp) = tmp$ProbeName
+  return(tmp[probenames,])
+}
+
+# This is for gene lists defined during the analysis, e.g. genes shared between two signatures
+# Entries are as for the all_gene_signatures list above
+analysis_defined_signatures = list()
+```
+
+## Proliferation associated genes
+
+We exclude proliferation associated genes from the following sources:
+
+  - Schwede M et al PlosONE 2013, p. e57799, table S1. Genes associated with proliferation.
+  - Grant et al 2013, Molecular Biology of the Cell, p. 3634. Supp Table 3. We select genes identified in at least 3 publications
+  - Genes included in the REACTOME cell cycle pathway (Gene set REACTOME_CELL_CYCLE from MSigDB v5.0)
+
+```{r proliferation_associated_genes, message=FALSE, warnings=FALSE}
+# Cell cycle associated genes
+suppressMessages(library(org.Hs.eg.db))
+prolif_genes_w_entrezid = select(org.Hs.eg.db, keys=proliferation_associated_genes$ENSGENEID, keytype="ENSEMBL", columns="ENTREZID")
+
+cycle_genes_filtered = subset(cycle_genes_grant_2013, Total...of.datasets >= 3)
+cycle_genes_ids = cycle_genes_filtered$entrez
+
+reactome_cycle_genes_w_entrezid = select(org.Hs.eg.db, keys=reactome_cell_cycle_genes, keytype="SYMBOL", columns="ENTREZID")
+
+all_prolif_associated_gene_ids = unique(c(cycle_genes_ids, prolif_genes_w_entrezid$ENTREZID, reactome_cycle_genes_w_entrezid$ENTREZID))
+
+all_gene_signatures[["Proliferation associated genes"]] = entrez_to_symbol(all_prolif_associated_gene_ids)
+```
+
+In total, we found `r length(all_prolif_associated_gene_ids)` proliferation genes.
+
+## Significant genes between Early organoids/2D Ground state and Whole organoids
+
+For ectocervical organoids, we selected all probes and corresponding genes from MB194 data that were significantly differentially expressed between Early organoids and Whole organoids and/or 2D (ground state) and whole organoids. We assign the maximum absolute log2 fold change from all probes of a gene to that list which will be furtheron used for ordering genes, also for the Ground State (McKeon) and GSE50206 expression atlas data. 
+
+For endocervical organoids, we apply the same procedure as for ectocervical ones only for the 2D (ground state) samples.
+
+```{r significant genes in MB194, message=FALSE}
+
+sel_comparisons = c("ecto_early_vs_whole_unpaired", "ecto_2D_vs_whole_all")
+
+all_sel_genes = list()
+for (n in sel_comparisons) {
+  tmp = all_results[[n]]
+  tmp2 = subset(tmp, !is.na(EntrezID) & adj.P.Val < 0.05 & abs(logFC) > 1.5)
+  tmp2$comparison = n
+  all_sel_genes[[n]] = tmp2 
+}
+
+sig_gene_tabs_all = do.call(rbind, all_sel_genes)
+
+# aggregate DGE results from Early vs. Whole or GroundState vs. Whole per gene (union)
+aggregate_fun1 = function(d) {
+  res=list()
+  #res = data.frame(GeneSymbol = unique(d$GeneSymbol))
+  res$group = ifelse(sel_comparisons[1] %in% d$comparison & sel_comparisons[2] %in% d$comparison, 2, ifelse(sel_comparisons[1] %in% d$comparison, 1, 3))
+  if(res$group==2) {
+    tmp = unlist(lapply(tapply(d$logFC, d$comparison, as.vector, simplify = F), sign))
+    if (max(tmp)==min(tmp)) {
+      res$logFC = d$logFC[which(abs(d$logFC) == max(abs(d$logFC), na.rm=T))]
+    } else res$logFC = 0 # set conflicting logFC between comparisons to 0
+  } else {
+    res$logFC = d$logFC[which(abs(d$logFC) == max(abs(d$logFC), na.rm=T))]
+  }
+  res$EntrezID = unique(d$EntrezID)
+  unlist(res)
+}
+
+sgdf = by(sig_gene_tabs_all, sig_gene_tabs_all$GeneSymbol, aggregate_fun1 )
+
+sig_gene_df = as.data.frame(do.call(rbind, sgdf))
+for (cc in colnames(sig_gene_df)) sig_gene_df[[cc]] = as.numeric(as.character(sig_gene_df[[cc]]))
+
+sig_gene_df_no_prolif = sig_gene_df[!as.character(sig_gene_df$EntrezID) %in% all_prolif_associated_gene_ids ,]
+
+all_gene_signatures[["MB194_SC_Vs_Diff_Ecto"]] = sig_gene_df
+all_gene_signatures[["MB194_SC_Vs_Diff_Ecto_no_prolif_genes"]] = sig_gene_df_no_prolif
+
+
+all_gene_signatures[["MB194_Ecto_vs_Endo_Diff"]] = subset(all_results[["ecto_vs_endo_whole"]], abs(logFC)>1 & adj.P.Val < 0.05)
+```
+
+
+## Selected gene sets
+
+We select several groups of genes of interest that lateron will be inspected for differential expression and visualized. 
+
+Gene sets include: 
+
+  - Herfs et al. (PNAS 2012) SCJ marker/signature genes
+
+```{r selected_gene_lists, message=FALSE, warning=FALSE}
+### Herfs
+
+symbols=select(org.Hs.eg.db, keys=as.character(Herfs_st_all$RefSeq.ID), columns=c("SYMBOL"),keytype="REFSEQ")
+symbols_unique = unique(symbols)
+Herfs_st_all = merge(Herfs_st_all, symbols_unique, by.x="RefSeq.ID",by.y="REFSEQ", all.x=T, sort=F)
+
+xx = melt(Herfs_st_all, id.vars=c("RefSeq.ID","SYMBOL"), measure.vars=colnames(Herfs_st_all)[grepl("p\\.value|Fold\\.Change", colnames(Herfs_st_all),perl=T)])
+xx$VariableName = substr(xx$variable, 1, regexpr("_", xx$variable)-1)
+xx$Comparison = substr(xx$variable, regexpr("_", xx$variable)+1, nchar(as.character(xx$variable)))
+
+# a few genes are duplicated in supp tables (n = 5). We here take the mean of their respectiv p-values and fold-changes
+Herfs_df_tmp = reshape2::dcast(xx, SYMBOL+RefSeq.ID+Comparison ~ VariableName, fun.aggregate=mean)
+Herfs_df_tmp$logFC = -1 * ifelse(as.numeric(Herfs_df_tmp$Fold.Change) >= 1, log2(as.numeric(Herfs_df_tmp$Fold.Change)), log2(1/abs(as.numeric(Herfs_df_tmp$Fold.Change))))
+Herfs_df_tmp$adj.P.Val = p.adjust(as.numeric(Herfs_df_tmp$p.value), "BH", n=20000) # assuming approx 20k genes not reported by the authors that are assumed to be not significant
+
+Herfs_df_tmp$Comparison = gsub("columnar_vs_junction","junction_vs_columnar",gsub("junction_vs_squamous","squamous_vs_junction", gsub("columnar_vs_squamous","squamous_vs_columnar", as.character(Herfs_df_tmp$Comparison))))
+Herfs_df = Herfs_df_tmp[,c("SYMBOL","RefSeq.ID","Comparison","p.value","logFC","adj.P.Val")]
+Herfs_df = merge(Herfs_df, symbol_to_entrez(unique(Herfs_df$SYMBOL)), by.x="SYMBOL", by.y="GeneSymbol", all.x=T, sort=F)
+
+all_gene_signatures[["Herfs SCJ markers"]] = symbol_to_entrez(c("KRT7","AGR2","GDA","MMP7","CD63"))
+all_gene_signatures[["Herfs SCJ markers and KRT5"]] =  symbol_to_entrez(c("KRT5","KRT7","AGR2","GDA","MMP7","CD63"))
+
+```
+
+## Significant genes between Ground State and differentiated cultures
+
+Here we extract significant genes from ground state SC vs. ALI/Matrigel/SAS differentiated cultures measured on Affymetrix HuExon-1.0 arrays. 
+
+We select several candidate lists: 
+
+  - GS_TOTAL: Genes with significant (adjp < 0.05) up or down-regulation (abs(logFC) > 1) in at least 5 out of 18 comparisons (across all tissues)
+  - GS_TOTAL_Sig_Median: As GS_Total, but the Median logFC is computed only based on results with adj.P-value < 10% to remove the influence of non-significant comparison results on the sign of the median
+
+```{r GroundState_SC_vs_Diff_top_gene_selection, message=FALSE}
+all_results_groundstate = get("all_results",ground_state_env)
+sel_comparisons = names(all_results_groundstate)[!names(all_results_groundstate) %in% c("SC_vs_ALI_intestinal_and_ft", "SC_vs_Matrigel_airway")]
+
+gs_comp_sets = list()
+gs_comp_sets[["GS_SQUAMOUS"]] = sel_comparisons[grepl("airway|bronchial|Esophagus|Krt5", sel_comparisons, perl=T)]
+gs_comp_sets[["GS_COLUMNAR"]] = sel_comparisons[grepl("Colon|Jejunum|Duodenum|Ileum|FallopianTube", sel_comparisons, perl=T)]
+gs_comp_sets[["GS_AIRWAY"]] = sel_comparisons[grepl("airway|bronchial", sel_comparisons, perl=T)]
+gs_comp_sets[["GS_INTESTINE"]] = sel_comparisons[grepl("Colon|Jejunum|Duodenum|Ileum|Esophagus|Krt5|Krt7", sel_comparisons, perl=T)]
+
+all_gs_fc = list()
+all_gs_p = list()
+all_gs_adjp = list()
+for (n in sel_comparisons) {
+  tmp = all_results_groundstate[[n]]
+  tmp = tmp[order(as.numeric(tmp$Row.names)),]
+  all_gs_fc[[n]] = tmp$logFC
+  all_gs_p[[n]] = tmp$P.Value
+  all_gs_adjp[[n]] = tmp$adj.P.Val
+}
+
+anno_cols = c("Row.names","SYMBOL","GENENAME","ENTREZID")
+anno_df = tmp[,anno_cols]
+colnames(anno_df) = gsub("SYMBOL", "GeneSymbol", gsub("ENTREZID", "EntrezID", colnames(anno_df)))
+anno_cols = gsub("SYMBOL", "GeneSymbol", gsub("ENTREZID", "EntrezID", anno_cols))
+
+gs_p = cbind(anno_df, do.call(cbind, all_gs_p))
+gs_fc = cbind(anno_df, do.call(cbind, all_gs_fc))
+gs_adjp = cbind(anno_df, do.call(cbind, all_gs_adjp))
+
+# Top genes over all tissues
+sig_counts_per_gene_all = apply(gs_adjp[,sel_comparisons]<0.05 & abs(gs_fc[,sel_comparisons])>1, 1, sum, na.rm=T)
+#sig_counts_per_gene_all_up = apply(gs_adjp[,sel_comparisons]<0.05 & gs_fc[,sel_comparisons]>1, 1, sum, na.rm=T)
+top_genes_gs_all = gs_fc[sig_counts_per_gene_all >= 5 & gs_fc$EntrezID!="NA" & !is.na(gs_fc$EntrezID) & !(gs_fc$EntrezID %in% all_prolif_associated_gene_ids),c(anno_cols, sel_comparisons)]
+top_genes_gs_all = top_genes_gs_all[order(top_genes_gs_all$GeneSymbol),]
+top_genes_gs_all$Median_FC = apply(as.matrix(top_genes_gs_all[,sel_comparisons]), 1, median, na.rm=T)
+top_genes_gs_all$Avg_FC = apply(as.matrix(top_genes_gs_all[,sel_comparisons]), 1, mean, na.rm=T)
+
+gs_top_all = by(top_genes_gs_all, top_genes_gs_all$GeneSymbol, function(x) {ind = which(abs(x$Median_FC) == max(abs(x$Median_FC))); x[ind,]} )
+all_gene_signatures[["GS_TOTAL"]] = as.data.frame(do.call(rbind, gs_top_all))  
+
+
+top_genes_gs_all_adjp = gs_adjp[sig_counts_per_gene_all >= 5 & gs_fc$EntrezID!="NA" & !is.na(gs_fc$EntrezID) & !(gs_fc$EntrezID %in% all_prolif_associated_gene_ids),c(anno_cols, sel_comparisons)]
+top_genes_gs_all_adjp = top_genes_gs_all_adjp[order(top_genes_gs_all_adjp$GeneSymbol),]
+top_genes_gs_all_sig_fc = top_genes_gs_all
+top_genes_gs_all_sig_fc[,sel_comparisons][top_genes_gs_all_adjp[,sel_comparisons]>0.1] <- NA
+
+top_genes_gs_all_sig_fc$Median_Sig_FC = apply(as.matrix(top_genes_gs_all_sig_fc[,sel_comparisons]), 1, median, na.rm=T)
+
+gs_top_all_sig = by(top_genes_gs_all_sig_fc, top_genes_gs_all_sig_fc$GeneSymbol, function(x) {ind = which(abs(x$Median_Sig_FC) == max(abs(x$Median_Sig_FC))); x[ind,]} )
+all_gene_signatures[["GS_TOTAL_Sig_Median"]] = as.data.frame(do.call(rbind, gs_top_all_sig))
+```
+
+
+
+
+
+```{r GS_MB194_overlap_global_updown, message=FALSE, fig.width=8, fig.height=8}
+
+sig_genes_sc_vs_diff_up = rownames(subset(all_gene_signatures[[ "MB194_SC_Vs_Diff_Ecto_no_prolif_genes"]], logFC > 0))
+sig_genes_sc_vs_diff_down = rownames(subset(all_gene_signatures[[ "MB194_SC_Vs_Diff_Ecto_no_prolif_genes"]], logFC < 0))
+sig_genes_gs_up = subset(all_gene_signatures[["GS_TOTAL"]], Median_FC > 0)$GeneSymbol
+sig_genes_gs_down = subset(all_gene_signatures[["GS_TOTAL"]], Median_FC < 0)$GeneSymbol
+#sig_genes_gs_up = subset(all_gene_signatures[["GS_TOTAL_Sig_Median"]], Median_Sig_FC > 0)$GeneSymbol
+#ig_genes_gs_down = subset(all_gene_signatures[["GS_TOTAL_Sig_Median"]], Median_Sig_FC < 0)$GeneSymbol
+
+genelists = list(GroundState_up = unique(sig_genes_gs_up), GroundState_down = unique(sig_genes_gs_down), MB194_SC_vs_Diff_up = unique(sig_genes_sc_vs_diff_up ), MB194_SC_vs_Diff_down= unique(sig_genes_sc_vs_diff_down ))
+pp = venn.diagram(genelists, filename= NULL, euler.d=T, scaled=T, fill=c("orchid","lightgreen", "pink","lightblue" ))
+grid.newpage()
+grid.draw(pp)
+
+analysis_defined_signatures[["gs_global_and_MB194_sc_vs_diff_shared_up"]] = symbol_to_entrez(sig_genes_gs_up[sig_genes_gs_up %in% sig_genes_sc_vs_diff_up])
+analysis_defined_signatures[["gs_global_and_MB194_sc_vs_diff_shared_down"]] = symbol_to_entrez(sig_genes_gs_down[sig_genes_gs_down %in% sig_genes_sc_vs_diff_down])
+
+```
+
+```{r save_data, echo=FALSE, results='hide', messages=FALSE}
+save(all_gene_signatures, analysis_defined_signatures, GSEA_motif_results_SC_vs_diff, file=paste(Rdata_folder, "MB194_Human_gene_lists_and_signatures.Rdata", sep="/"))
+```
+
+# Software versions
+
+```{r}
+sessionInfo()
+```

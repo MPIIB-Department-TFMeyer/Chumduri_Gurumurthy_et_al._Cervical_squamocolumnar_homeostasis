@@ -1,0 +1,191 @@
+---
+title: "MB194 Mouse Cervix Organoids - QC and data preprocessing"
+author: "Hilmar Berger"
+date: "`r format(Sys.time(), '%d %B, %Y %H:%M:%S')`"
+output: html_document
+---
+
+```{r, echo=FALSE, results='hide'}
+rm(list=ls())
+library(limma)
+suppressMessages(library(xlsx))
+library(pheatmap)
+library(xtable)
+setwd("/data_genome2/projects/MB194_Cervical_organoids/Mouse/")
+```
+
+```{r, echo=FALSE,  message=FALSE, results='hide'}
+#ed = read.xlsx("ExpDesign.xls", 1)
+ed = read.table("ExpDesign_rehyb.txt",sep="\t",header=T, as.is=T)
+ed = subset(ed, Ecto_Endo_paper==1)
+#colnames(ed) = gsub("sample_name","sample_ID",colnames(ed))
+ed$sample_ID = ed$scan_id
+ed$array_ID = sapply(strsplit(ed$file_name, "_"), function(x) paste(x[1:5],collapse="_"))
+rownames(ed) = gsub(".txt","",ed$file_name)
+
+setwd("raw_files/files_Jul2015_and_rehyb_Apr2016/")
+agilent.datacolumns=list(E='gMedianSignal',Eb = 'gBGMedianSignal',isNonUniform='gIsFeatNonUnifOL', isPopOutlier='gIsFeatPopnOL', multDetrendSignal='gMultDetrendSignal');
+intensities =read.maimages(paste(ed$file_name,sep=""), source="agilent.median", green.only=TRUE, columns=agilent.datacolumns)
+setwd("..")
+
+# fix outdated chip annotations
+#new_anno_file = "/home/hilmar/Documents/MPI/MicroArray/60k_Array_Annotations/Custom_60k_annotations_2015-05-22.Rdata"
+new_anno_file = "/data_genome1/References/MicroArray/Agilent/8x60k_028005_mouse/Mouse_028005_annotations_2015-07-17.Rdata"
+load(new_anno_file)
+old_anno = intensities$genes
+take_over_cols = colnames(old_anno)[!colnames(old_anno) %in% c("GeneName","Description","SystematicName")]
+tmp = old_anno[,take_over_cols]
+tmp$index=1:nrow(tmp)
+tmp = merge(tmp, anno_tab_final, by="ProbeName", all.x=T, sort=F)
+new_col_order = c(take_over_cols, colnames(tmp)[!colnames(tmp) %in% take_over_cols])
+#new_col_order = new_col_order[!new_col_order %in% c("GO_BP","GO_CC","GO_MF")]
+new_anno = tmp[order(tmp$index),new_col_order]
+
+intensities$genes = new_anno
+
+```
+
+
+```{r, echo=FALSE,  message=FALSE, results='hide'}
+intensities$probe_exclude=(intensities$isNonUniform>0)|(intensities$isPopOutlier>0)
+intensities$E[intensities$probe_exclude] <- NA
+```
+
+## Data overview
+This document describes the preprocessing and QC of mouse microarray data from MB194 (Cindrilla Chumduri, Rajendra Kumar). 
+Micro arrays used had design Agilent-028005 SurePrint G3 Mouse GE 8x60K. 
+
+### Samples 
+```{r, echo=FALSE, results='asis'}
+ed_short = ed[,c("scan_id","ShortName","Organoid.Type","patient_or_mouse_id","Infection", "Time.post.infection")]
+print.xtable(xtable(ed_short,display=c("s","s","s","s","s","s","s"), align="|l|l|l|l|l|l|l|"), type="html", file="" , include.rownames=F)
+```
+
+## Raw intensity data
+
+### Excluded probes (non-uniform feature or population outlier)
+
+```{r, barplot_excl_probes, echo=FALSE}
+ex_cnt = apply(intensities$probe_exclude,2,sum)
+barplot(ex_cnt, las=2, main = "number of excluded probes/sample")
+```
+
+### Intensity distribution across samples
+```{r, boxplot_raw, echo=FALSE, fig.width=10, fig.height=8}
+par(mfrow=c(2,1))
+ii = log2(intensities$E)
+colnames(ii) = ed[colnames(ii),]$sample_ID
+boxplot(ii, las=2, main = "Raw FG intensities", ylim=c(0,20))
+ii = log2(intensities$Eb)
+colnames(ii) = ed[colnames(ii),]$sample_ID
+boxplot(ii, las=2, main = "Raw BG intensities", ylim=c(0,20))
+```
+
+### Correlation of raw intensities across samples
+```{r, heatmap_cor_raw, echo=FALSE, fig.width=12, fig.height=8}
+raw_cor = cor(log2(intensities$E),method="spearman", use="pairwise")
+colnames(raw_cor) = ed[colnames(raw_cor),]$sample_ID
+#rownames(raw_cor) = ed[rownames(raw_cor),]$sample_ID
+#pheatmap(raw_cor, cluster_rows = F, cluster_cols=F)
+pheatmap(raw_cor, cluster_col=F, cluster_row=F)
+```
+
+## Preprocessing
+
+Data will be preprocessed as follows:
+
+* Background for each array will be corrected using the "normexp" method (Ritchie et al 2007, Bioinformatics, p. 2700-07) and an offset of 15. 
+* Between-array normalization will be perfomed using the quantile method (Bolstad et al 2003, Bioinformatics, p. 185).
+
+## Background correction
+```{r, bg_correction, echo=TRUE, results='hide'}
+bg_corrected = backgroundCorrect(intensities,method="normexp",offset=15)
+```
+
+### Intensity distribution across samples after background correction
+```{r, boxplot_fg_bg_corrected, echo=FALSE}
+boxplot(log2(bg_corrected$E), las=2, main = "BG-corrected FG intensities", ylim=c(-2,20))
+```
+
+
+### Normalization
+
+```{r, normalization, echo=TRUE, results='hide'}
+normalized = normalizeBetweenArrays(bg_corrected,method="quantile")
+```
+
+#### Intensity distribution across samples after BG correction and normalization
+```{r, boxplot_fg_normalized, echo=FALSE}
+boxplot(log2(normalized$E), las=2, main = "Normalized FG intensities", ylim=c(-2,20))
+```
+
+#### Correlation of normalized intensities across samples
+```{r, heatmap_cor_normalized, echo=FALSE}
+norm_cor = cor(log2(normalized$E),method="spearman", use="pairwise")
+colnames(norm_cor) = ed[colnames(norm_cor),]$scan_id
+rownames(norm_cor) = ed[rownames(norm_cor),]$ShortName
+pheatmap(norm_cor)
+```
+
+## Primary Component Analysis
+```{r, PCA, echo=FALSE, fig.width=8, fig.height=8}
+norm_exp = normalized$E
+NA_rows = apply(norm_exp,1,function(x) sum(is.na(x)))
+pca = prcomp(t(norm_exp[NA_rows==0,]))
+imp = summary(pca)$importance
+plot(pca$x[,1], pca$x[,2], type="n", xlab=paste("1st PC (",round(imp[2,1],2)*100 ,"% var explained)",sep="" ), ylab=paste("2nd PC (",round(imp[2,2],2)*100 ,"% var explained)",sep="" ), main="PCA on normalized expression data")
+cp = palette(rainbow(8))
+text(pca$x[,1],pca$x[,2],labels = paste(ed[colnames(normalized$E),]$ShortName,ed[colnames(normalized$E),]$patient_or_mouse_id, sep="_"), col=cp[as.numeric(as.factor(ed[colnames(normalized$E),]$Organoid.Type))])
+```
+
+## Control probes
+
+The following control probes exist on the arrays used in this experiment:
+
+* Corner associated (used for orientation purposes during scanning)
+  * Bright corner 
+  * Dark corner 
+* Negative controls
+  * 3xSLv1 (hairpin probe that does not hybridize well with any possible RNA)
+* Positive controls
+  * Human GAPDH and PGK1 probes
+  * Deletion stringency probes (DCP, probe with varying number of insertions/changes with respect to reference; the number after the "_" denotes the number of differences to the reference which should correlate with lower expression)
+  * E1A_r60: spike-in probes with concentrations that should cover the whole dynamic range of the array
+
+There are a few other expression probes that are used by Agilent's feature extraction/QC pipeline. 
+
+```{r, qc_probes, echo=FALSE, fig.width=12, fig.height=3}
+control_probes = which(intensities$genes$ControlType!=0)
+cp_data = intensities$E[control_probes,]
+cp_names = intensities$genes[control_probes,]
+selected_controls = ifelse(substr(cp_names$ProbeName,1,4)=="ERCC",F,T)
+
+# control probes
+for (i in 1:ncol(cp_data)) {
+  boxplot(log2(cp_data[selected_controls,i]) ~ factor(cp_names$ProbeName[selected_controls]),las=2, main=paste("Sample",i), outline=F)
+}
+```
+
+## Number of detected probes
+Signal for probes will be considered detected if the expression of a probe is above the 95% quantile of expression in negative control probes. 
+In a typical experiment one would expect about 50% of all genes to be detectable.
+
+```{r, expr_count, echo=FALSE}
+neg95 <- apply(normalized$E[normalized$genes$ControlType==-1,],2,function(x) quantile(x,p=0.95, na.rm=T))
+cutoff <- matrix(1.1*neg95,nrow(normalized),ncol(normalized),byrow=TRUE)
+isexpr <- rowSums(normalized$E > cutoff, na.rm=T) >= 2
+# about 50% of genes should be detected
+#table(isexpr)
+```
+
+```{r, number_expressed, echo=FALSE}
+isexpr_sample <- colSums(normalized$E > cutoff, na.rm=T)
+sample_order = order(ed[names(isexpr_sample),]$scan_id)
+isexpr_sample_ordered = isexpr_sample[sample_order]
+nn = ed[names(isexpr_sample),]$sample_ID[sample_order]
+barplot(isexpr_sample_ordered, main="number of detected probes per sample", las=2, names.arg=nn)
+```
+
+```{r, saving, echo=FALSE}
+save(ed, intensities, normalized, file="MB194_mouse_micro_array_preprocessed_data.Rdata")
+```

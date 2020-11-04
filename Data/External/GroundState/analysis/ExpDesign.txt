@@ -1,0 +1,169 @@
+sample_id	geo_id	geo_data_set	name	cell_type	cell_state	organ	culture	phenotype
+GSM1196933_BESC-1.CEL	GSM1196933	GSE49292	Barrett’s esophagus stem cell-1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1196934_BESC-2.CEL	GSM1196934	GSE49292	Barrett’s esophagus stem cell-2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1196935_BESC-3.CEL	GSM1196935	GSE49292	Barrett’s esophagus stem cell-3	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1196936_BESC-4.CEL	GSM1196936	GSE49292	Barrett’s esophagus stem cell-4	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1196937_BESC-5.CEL	GSM1196937	GSE49292	Barrett’s esophagus stem cell-5	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1196938_BESC-6.CEL	GSM1196938	GSE49292	Barrett’s esophagus stem cell-6	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1196939_EsoSC-1.CEL	GSM1196939	GSE49292	Esophagus stem cell-1	Esophagus	SC	intestine	in-vitro	normal
+GSM1196940_EsoSC-2.CEL	GSM1196940	GSE49292	Esophagus stem cell-2	Esophagus	SC	intestine	in-vitro	normal
+GSM1196941_EsoSC-3.CEL	GSM1196941	GSE49292	Esophagus stem cell-3	Esophagus	SC	intestine	in-vitro	normal
+GSM1385148_Duodenum-1.CEL	GSM1385148	GSE57584	Duodenum_stem cell_rep1	Duodenum	SC	intestine	in-vitro	normal
+GSM1385149_Duodenum-2.CEL	GSM1385149	GSE57584	Duodenum_stem cell_rep2	Duodenum	SC	intestine	in-vitro	normal
+GSM1385150_Jejunum-1.CEL	GSM1385150	GSE57584	Jejunum_stem cell_rep1	Jejunum	SC	intestine	in-vitro	normal
+GSM1385151_Jejunum-2.CEL	GSM1385151	GSE57584	Jejunum_stem cell_rep2	Jejunum	SC	intestine	in-vitro	normal
+GSM1385152_Ileum-1.CEL	GSM1385152	GSE57584	Ileum_stem cell_rep1	Ileum	SC	intestine	in-vitro	normal
+GSM1385153_Ileum-2.CEL	GSM1385153	GSE57584	Ileum_stem cell_rep2	Ileum	SC	intestine	in-vitro	normal
+GSM1385154_AC-1.CEL	GSM1385154	GSE57584	AC_stem cell_rep1	Colon ascendens	SC	intestine	in-vitro	normal
+GSM1385155_AC-2.CEL	GSM1385155	GSE57584	AC_stem cell_rep2	Colon ascendens	SC	intestine	in-vitro	normal
+GSM1385156_TC-1.CEL	GSM1385156	GSE57584	TC_stem cell_rep1	Colon transversum	SC	intestine	in-vitro	normal
+GSM1385157_TC-2.CEL	GSM1385157	GSE57584	TC_stem cell_rep2	Colon transversum	SC	intestine	in-vitro	normal
+GSM1385158_DC-1.CEL	GSM1385158	GSE57584	DC_stem cell_rep1	Colon descendens	SC	intestine	in-vitro	normal
+GSM1385159_DC-2.CEL	GSM1385159	GSE57584	DC_stem cell_rep2	Colon descendens	SC	intestine	in-vitro	normal
+GSM1385160_Duodenum-ALI-1.CEL	GSM1385160	GSE57584	Duodenum_ALI_rep1	Duodenum	ALI	intestine	in-vitro	normal
+GSM1385161_Duodenum-ALI-2.CEL	GSM1385161	GSE57584	Duodenum_ALI_rep2	Duodenum	ALI	intestine	in-vitro	normal
+GSM1385162_Jejunum-ALI-1.CEL	GSM1385162	GSE57584	Jejunum_ALI_rep1	Jejunum	ALI	intestine	in-vitro	normal
+GSM1385163_Jejunum-ALI-2.CEL	GSM1385163	GSE57584	Jejunum_ALI_rep2	Jejunum	ALI	intestine	in-vitro	normal
+GSM1385164_Ileum-ALI-1.CEL	GSM1385164	GSE57584	Ileum_ALI_rep1	Ileum	ALI	intestine	in-vitro	normal
+GSM1385165_Ileum-ALI-2.CEL	GSM1385165	GSE57584	Ileum_ALI_rep2	Ileum	ALI	intestine	in-vitro	normal
+GSM1385166_AC-ALI-1.CEL	GSM1385166	GSE57584	AC_ALI_rep1	Colon ascendens	ALI	intestine	in-vitro	normal
+GSM1385167_AC-ALI-2.CEL	GSM1385167	GSE57584	AC_ALI_rep2	Colon ascendens	ALI	intestine	in-vitro	normal
+GSM1385168_TC-ALI-1.CEL	GSM1385168	GSE57584	TC_ALI_rep1	Colon transversum	ALI	intestine	in-vitro	normal
+GSM1385169_TC-ALI-2.CEL	GSM1385169	GSE57584	TC_ALI_rep2	Colon transversum	ALI	intestine	in-vitro	normal
+GSM1385170_DC-ALI-1.CEL	GSM1385170	GSE57584	DC_ALI_rep1	Colon descendens	ALI	intestine	in-vitro	normal
+GSM1385171_DC-ALI-2.CEL	GSM1385171	GSE57584	DC_ALI_rep2	Colon descendens	ALI	intestine	in-vitro	normal
+GSM1420654_Normal_epithelium1.CEL	GSM1420654	GSE58842	Normal fallopian tube epithelium 1	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420655_Normal_epithelium2.CEL	GSM1420655	GSE58842	Normal fallopian tube epithelium 2	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420656_Normal_epithelium3.CEL	GSM1420656	GSE58842	Normal fallopian tube epithelium 3	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420657_Normal_epithelium4.CEL	GSM1420657	GSE58842	Normal fallopian tube epithelium 4	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420658_Normal_epithelium5.CEL	GSM1420658	GSE58842	Normal fallopian tube epithelium 5	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420659_Normal_epithelium6.CEL	GSM1420659	GSE58842	Normal fallopian tube epithelium 6	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420660_Normal_epithelium7.CEL	GSM1420660	GSE58842	Normal fallopian tube epithelium 7	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1420661_Tumor1.CEL	GSM1420661	GSE58842	High grade ovarian cancer 1	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1420662_Tumor2.CEL	GSM1420662	GSE58842	High grade ovarian cancer 2	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1420663_Tumor3.CEL	GSM1420663	GSE58842	High grade ovarian cancer 3	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1420664_TYPE_1_SCOUTs4.CEL	GSM1420664	GSE58842	TYPE 1 SCOUTs 4	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1420665_TYPE_1_SCOUTs5.CEL	GSM1420665	GSE58842	TYPE 1 SCOUTs 5	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1420666_TYPE_1_SCOUTs6.CEL	GSM1420666	GSE58842	TYPE 1 SCOUTs 6	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1420667_TYPE_1_SCOUTs7.CEL	GSM1420667	GSE58842	TYPE 1 SCOUTs 7	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1420668_TYPE_2_SCOUTs1.CEL	GSM1420668	GSE58842	TYPE 2 SCOUTs 1	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1420669_TYPE_2_SCOUTs2.CEL	GSM1420669	GSE58842	TYPE 2 SCOUTs 2	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1420670_TYPE_2_SCOUTs3.CEL	GSM1420670	GSE58842	TYPE 2 SCOUTs 3	FT epithelium	NA	fallopian tube	tissue (LCM)	SCOUT
+GSM1585809_BE1-1.CEL	GSM1585809	GSE65013	Barrett's esophagus stem cells from patient 1, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585810_BE1-2.CEL	GSM1585810	GSE65013	Barrett's esophagus stem cells from patient 1, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585811_BE2-1.CEL	GSM1585811	GSE65013	Barrett's esophagus stem cells from patient 2, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585812_BE2-2.CEL	GSM1585812	GSE65013	Barrett's esophagus stem cells from patient 2, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585813_BE3-1.CEL	GSM1585813	GSE65013	Barrett's esophagus stem cells from patient 3, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585814_BE3-2.CEL	GSM1585814	GSE65013	Barrett's esophagus stem cells from patient 3, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585815_BE4-1.CEL	GSM1585815	GSE65013	Barrett's esophagus stem cells from patient 4, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585816_BE4-2.CEL	GSM1585816	GSE65013	Barrett's esophagus stem cells from patient 4, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585817_BE5-1.CEL	GSM1585817	GSE65013	Barrett's esophagus stem cells from patient 5, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585818_BE5-2.CEL	GSM1585818	GSE65013	Barrett's esophagus stem cells from patient 5, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585819_BE6-1.CEL	GSM1585819	GSE65013	Barrett's esophagus stem cells from patient 6, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585820_BE6-2.CEL	GSM1585820	GSE65013	Barrett's esophagus stem cells from patient 6, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585821_BE7-1.CEL	GSM1585821	GSE65013	Barrett's esophagus stem cells from patient 7, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585822_BE7-2.CEL	GSM1585822	GSE65013	Barrett's esophagus stem cells from patient 7, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585823_BE8-1.CEL	GSM1585823	GSE65013	Barrett's esophagus stem cells from patient 8, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585824_BE8-2.CEL	GSM1585824	GSE65013	Barrett's esophagus stem cells from patient 8, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585825_BE9-1.CEL	GSM1585825	GSE65013	Barrett's esophagus stem cells from patient 9, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585826_BE9-2.CEL	GSM1585826	GSE65013	Barrett's esophagus stem cells from patient 9, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585827_BE10-1.CEL	GSM1585827	GSE65013	Barrett's esophagus stem cells from patient 10, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585828_BE10-2.CEL	GSM1585828	GSE65013	Barrett's esophagus stem cells from patient 10, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585829_BE11-1.CEL	GSM1585829	GSE65013	Barrett's esophagus stem cells from patient 11, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585830_BE11-2.CEL	GSM1585830	GSE65013	Barrett's esophagus stem cells from patient 11, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585831_BE12-1.CEL	GSM1585831	GSE65013	Barrett's esophagus stem cells from patient 12, rep1	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585832_BE12-2.CEL	GSM1585832	GSE65013	Barrett's esophagus stem cells from patient 12, rep2	Barretts	SC	intestine	in-vitro	metaplasia
+GSM1585833_BE_ALI_BE7_-1.CEL	GSM1585833	GSE65013	air liquid interface culture of Barrett's esophagus stem cells (patient 7), rep1	Barretts	ALI	intestine	in-vitro	metaplasia
+GSM1585834_BE_ALI_BE7_-2.CEL	GSM1585834	GSE65013	air liquid interface culture of Barrett's esophagus stem cells (patient 7), rep2	Barretts	ALI	intestine	in-vitro	metaplasia
+GSM1585835_Eso_ALI_Eso9_-1.CEL	GSM1585835	GSE65013	air liquid interface culture of normal esophagus stem cells (patient 9), rep1	Esophagus	ALI	intestine	in-vitro	metaplasia
+GSM1585836_Eso_ALI_Eso9_-2.CEL	GSM1585836	GSE65013	air liquid interface culture of normal esophagus stem cells (patient 9), rep2	Esophagus	ALI	intestine	in-vitro	metaplasia
+GSM1585837_Eso8-1.CEL	GSM1585837	GSE65013	Normal esophagus stem cells from patient 8, rep1	Esophagus	SC	intestine	in-vitro	normal
+GSM1585838_Eso8-2.CEL	GSM1585838	GSE65013	Normal esophagus stem cells from patient 8, rep2	Esophagus	SC	intestine	in-vitro	normal
+GSM1585839_Eso9-1.CEL	GSM1585839	GSE65013	Normal esophagus stem cells from patient 9, rep1	Esophagus	SC	intestine	in-vitro	normal
+GSM1585840_Eso9-2.CEL	GSM1585840	GSE65013	Normal esophagus stem cells from patient 9, rep2	Esophagus	SC	intestine	in-vitro	normal
+GSM1585841_GC1-1.CEL	GSM1585841	GSE65013	Gastric cardia stem cells from patient 1, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585842_GC1-2.CEL	GSM1585842	GSE65013	Gastric cardia stem cells from patient 1, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585843_GC2-1.CEL	GSM1585843	GSE65013	Gastric cardia stem cells from patient 2, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585844_GC2-2.CEL	GSM1585844	GSE65013	Gastric cardia stem cells from patient 2, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585845_GC3-1.CEL	GSM1585845	GSE65013	Gastric cardia stem cells from patient 3, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585846_GC3-2.CEL	GSM1585846	GSE65013	Gastric cardia stem cells from patient 3, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585847_GC4-1.CEL	GSM1585847	GSE65013	Gastric cardia stem cells from patient 4, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585848_GC4-2.CEL	GSM1585848	GSE65013	Gastric cardia stem cells from patient 4, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585849_GC5-1.CEL	GSM1585849	GSE65013	Gastric cardia stem cells from patient 5, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585850_GC5-2.CEL	GSM1585850	GSE65013	Gastric cardia stem cells from patient 5, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585851_GC6-1.CEL	GSM1585851	GSE65013	Gastric cardia stem cells from patient 6, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585852_GC6-2.CEL	GSM1585852	GSE65013	Gastric cardia stem cells from patient 6, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585853_GC7-1.CEL	GSM1585853	GSE65013	Gastric cardia stem cells from patient 7, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585854_GC7-2.CEL	GSM1585854	GSE65013	Gastric cardia stem cells from patient 7, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585855_GC8-1.CEL	GSM1585855	GSE65013	Gastric cardias stem cells from patient 8, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585856_GC8-2.CEL	GSM1585856	GSE65013	Gastric cardias stem cells from patient 8, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585857_GC9-1.CEL	GSM1585857	GSE65013	Gastric cardia stem cells from patient 9, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585858_GC9-2.CEL	GSM1585858	GSE65013	Gastric cardia stem cells from patient 9, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585859_GC10-1.CEL	GSM1585859	GSE65013	Gastric cardia stem cells from patient 10, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585860_GC10-2.CEL	GSM1585860	GSE65013	Gastric cardia stem cells from patient 10, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585861_GC11-1.CEL	GSM1585861	GSE65013	Gastric cardia stem cells from patient 11, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585862_GC11-2.CEL	GSM1585862	GSE65013	Gastric cardia stem cells from patient 11, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585863_GC12-1.CEL	GSM1585863	GSE65013	Gastric cardia stem cells from patient 12, rep1	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585864_GC12-2.CEL	GSM1585864	GSE65013	Gastric cardia stem cells from patient 12, rep2	Gastric Cardia	SC	intestine	in-vitro	normal
+GSM1585865_GC_ALI_GC7_-1.CEL	GSM1585865	GSE65013	air liquid interface culture of gastric cardia stem cells (patient 7), rep1	Gastric Cardia	ALI	intestine	in-vitro	normal
+GSM1585866_GC_ALI_GC7_-2.CEL	GSM1585866	GSE65013	air liquid interface culture of gastric cardia stem cells (patient 7), rep2	Gastric Cardia	ALI	intestine	in-vitro	normal
+GSM1585867_KRT5_ALI-1.CEL	GSM1585867	GSE65013	air liquid interface culture of Krt5 + cells from fetal esophagus, rep1	Krt5+ fetal esophagus	ALI	intestine	in-vitro	normal
+GSM1585868_KRT5_ALI-2.CEL	GSM1585868	GSE65013	air liquid interface culture of Krt5 + cells from fetal esophagus, rep2	Krt5+ fetal esophagus	ALI	intestine	in-vitro	normal
+GSM1585869_Krt5_Eso-1.CEL	GSM1585869	GSE65013	Krt5 + cells from fetal esophagus, rep1	Krt5+ fetal esophagus	SC	intestine	in-vitro	normal
+GSM1585870_Krt5_Eso-2.CEL	GSM1585870	GSE65013	Krt5 + cells from fetal esophagus, rep2	Krt5+ fetal esophagus	SC	intestine	in-vitro	normal
+GSM1585871_KRT7_ALI-1.CEL	GSM1585871	GSE65013	air liquid interface culture of Krt7 + cells from fetal esophagus, rep1	Krt7+ fetal esophagus	ALI	intestine	in-vitro	normal
+GSM1585872_KRT7_ALI-2.CEL	GSM1585872	GSE65013	air liquid interface culture of Krt7 + cells from fetal esophagus, rep2	Krt7+ fetal esophagus	ALI	intestine	in-vitro	normal
+GSM1585873_Krt7_Eso-1.CEL	GSM1585873	GSE65013	Krt7 + cells from fetal esophagus, rep1	Krt7+ fetal esophagus	SC	intestine	in-vitro	normal
+GSM1585874_Krt7_Eso-2.CEL	GSM1585874	GSE65013	Krt7 + cells from fetal esophagus, rep2	Krt7+ fetal esophagus	SC	intestine	in-vitro	normal
+GSM1614646_Ileum-ALI-3.CEL	GSM1614646	GSE66115	Ileum_ALI_rep3	Ileum	ALI	intestine	in-vitro	normal
+GSM1614647_Ileum-ALI-4.CEL	GSM1614647	GSE66115	Ileum_ALI_rep4	Ileum	ALI	intestine	in-vitro	normal
+GSM1701054_patient1_invasive_SC.CEL	GSM1701054	GSE69429	patient1_invasive_SC	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1701055_patient1_normal.CEL	GSM1701055	GSE69429	patient1_normal	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1701056_patient1_STIC.CEL	GSM1701056	GSE69429	patient1_STIC	FT epithelium	NA	fallopian tube	tissue (LCM)	STIC
+GSM1701057_patient2_invasive_SC.CEL	GSM1701057	GSE69429	patient2_invasive_SC	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1701058_patient2_normal.CEL	GSM1701058	GSE69429	patient2_normal	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1701059_patient2_STIC.CEL	GSM1701059	GSE69429	patient2_STIC	FT epithelium	NA	fallopian tube	tissue (LCM)	STIC
+GSM1701060_patient3_invasive_SC.CEL	GSM1701060	GSE69429	patient3_invasive_SC	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1701061_patient3_normal.CEL	GSM1701061	GSE69429	patient3_normal	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1701062_patient3_STIC.CEL	GSM1701062	GSE69429	patient3_STIC	FT epithelium	NA	fallopian tube	tissue (LCM)	STIC
+GSM1701063_patient4_invasive_SC.CEL	GSM1701063	GSE69429	patient4_invasive_SC	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1701064_patient4_normal.CEL	GSM1701064	GSE69429	patient4_normal	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1701065_patient4_STIC.CEL	GSM1701065	GSE69429	patient4_STIC	FT epithelium	NA	fallopian tube	tissue (LCM)	STIC
+GSM1701066_patient5_invasive_SC.CEL	GSM1701066	GSE69429	patient5_invasive_SC	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1701067_patient5_normal.CEL	GSM1701067	GSE69429	patient5_normal	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1701068_patient5_STIC.CEL	GSM1701068	GSE69429	patient5_STIC	FT epithelium	NA	fallopian tube	tissue (LCM)	STIC
+GSM1701069_patient6_invasive_SC.CEL	GSM1701069	GSE69429	patient6_invasive_SC	FT epithelium	NA	fallopian tube	tissue (LCM)	cancer
+GSM1701070_patient6_normal.CEL	GSM1701070	GSE69429	patient6_normal	FT epithelium	NA	fallopian tube	tissue (LCM)	normal
+GSM1701071_patient6_STIC.CEL	GSM1701071	GSE69429	patient6_STIC	FT epithelium	NA	fallopian tube	tissue (LCM)	STIC
+GSM1701439_FTSC_1.CEL	GSM1701439	GSE69453	FTSC, rep1	FT epithelium	SC	fallopian tube	in-vitro	normal
+GSM1701440_FTSC_2.CEL	GSM1701440	GSE69453	FTSC, rep2	FT epithelium	SC	fallopian tube	in-vitro	normal
+GSM1701441_FTSC_ALI_1.CEL	GSM1701441	GSE69453	FTSC-ALI, rep1	FT epithelium	ALI	fallopian tube	in-vitro	normal
+GSM1701442_FTSC_ALI_2.CEL	GSM1701442	GSE69453	FTSC-ALI, rep2	FT epithelium	ALI	fallopian tube	in-vitro	normal
+GSM808352.CEL	GSM808352	GSE32604	DASC-3T3-1	Distal airway epithelium	SC	airways/lung	in-vitro	normal
+GSM808353.CEL	GSM808353	GSE32604	DASC-3T3-2	Distal airway epithelium	SC	airways/lung	in-vitro	normal
+GSM808354.CEL	GSM808354	GSE32604	DASC-3T3-3	Distal airway epithelium	SC	airways/lung	in-vitro	normal
+GSM808355.CEL	GSM808355	GSE32604	DASC-ALI1	Distal airway epithelium	ALI	airways/lung	in-vitro	normal
+GSM808356.CEL	GSM808356	GSE32604	DASC-ALI2	Distal airway epithelium	ALI	airways/lung	in-vitro	normal
+GSM808357.CEL	GSM808357	GSE32604	DASC-ALI3	Distal airway epithelium	ALI	airways/lung	in-vitro	normal
+GSM808358.CEL	GSM808358	GSE32604	DASC-MAT1	Distal airway epithelium	Matrigel	airways/lung	in-vitro	normal
+GSM808359.CEL	GSM808359	GSE32604	DASC-MAT2	Distal airway epithelium	Matrigel	airways/lung	in-vitro	normal
+GSM808360.CEL	GSM808360	GSE32604	NESC-3T3-1	Nasal turbinate epithelium	SC	airways/lung	in-vitro	normal
+GSM808361.CEL	GSM808361	GSE32604	NESC-3T3-2	Nasal turbinate epithelium	SC	airways/lung	in-vitro	normal
+GSM808362.CEL	GSM808362	GSE32604	NESC-3T3-3	Nasal turbinate epithelium	SC	airways/lung	in-vitro	normal
+GSM808363.CEL	GSM808363	GSE32604	NESC-ALI1	Nasal turbinate epithelium	ALI	airways/lung	in-vitro	normal
+GSM808364.CEL	GSM808364	GSE32604	NESC-ALI2	Nasal turbinate epithelium	ALI	airways/lung	in-vitro	normal
+GSM808365.CEL	GSM808365	GSE32604	NESC-ALI3	Nasal turbinate epithelium	ALI	airways/lung	in-vitro	normal
+GSM808366.CEL	GSM808366	GSE32604	NESC-MAT1	Nasal turbinate epithelium	Matrigel	airways/lung	in-vitro	normal
+GSM808367.CEL	GSM808367	GSE32604	NESC-MAT2	Nasal turbinate epithelium	Matrigel	airways/lung	in-vitro	normal
+GSM808368.CEL	GSM808368	GSE32604	NESC-MAT3	Nasal turbinate epithelium	Matrigel	airways/lung	in-vitro	normal
+GSM808369.CEL	GSM808369	GSE32604	NESC-SAS1	Nasal turbinate epithelium	SAS	airways/lung	in-vitro	normal
+GSM808370.CEL	GSM808370	GSE32604	NESC-SAS2	Nasal turbinate epithelium	SAS	airways/lung	in-vitro	normal
+GSM808371.CEL	GSM808371	GSE32604	NESC-SAS3	Nasal turbinate epithelium	SAS	airways/lung	in-vitro	normal
+GSM808372.CEL	GSM808372	GSE32604	TASC-3T3-1	Tracheobronchial epithelia	SC	airways/lung	in-vitro	normal
+GSM808373.CEL	GSM808373	GSE32604	TASC-3T3-2	Tracheobronchial epithelia	SC	airways/lung	in-vitro	normal
+GSM808374.CEL	GSM808374	GSE32604	TASC-3T3-3	Tracheobronchial epithelia	SC	airways/lung	in-vitro	normal
+GSM808375.CEL	GSM808375	GSE32604	TASC-ALI1	Tracheobronchial epithelia	ALI	airways/lung	in-vitro	normal
+GSM808376.CEL	GSM808376	GSE32604	TASC-ALI2	Tracheobronchial epithelia	ALI	airways/lung	in-vitro	normal
+GSM808377.CEL	GSM808377	GSE32604	TASC-ALI3	Tracheobronchial epithelia	ALI	airways/lung	in-vitro	normal
+GSM808378.CEL	GSM808378	GSE32604	TASC-MAT1	Tracheobronchial epithelia	Matrigel	airways/lung	in-vitro	normal
+GSM808379.CEL	GSM808379	GSE32604	TASC-MAT2	Tracheobronchial epithelia	Matrigel	airways/lung	in-vitro	normal
